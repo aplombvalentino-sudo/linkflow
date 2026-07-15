@@ -33,3 +33,12 @@ export class RateLimitError extends AppError {
     super("rate-limited", message, 429);
   }
 }
+
+/** Raised when a backend dependency (e.g. the Firebase Admin SDK) is
+ *  unavailable/misconfigured, so callers return a clean 503 instead of leaking
+ *  a raw SDK stack trace (risks #6–#11). */
+export class ServiceUnavailableError extends AppError {
+  constructor(message = "Service temporarily unavailable. Try again.") {
+    super("service-unavailable", message, 503);
+  }
+}

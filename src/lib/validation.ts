@@ -12,8 +12,11 @@ import {
   RESERVED_HANDLES,
   MIN_STATS_DAYS,
   MAX_STATS_DAYS,
+  MAX_DISPLAY_NAME_LEN,
+  MAX_BIO_LEN,
 } from "./constants";
 import { ValidationError } from "./errors";
+import { stripControlChars } from "./sanitize";
 
 export type Device = (typeof DEVICES)[number];
 
@@ -105,4 +108,24 @@ export function assertHandle(raw: unknown): string {
 export function clampStatsDays(days: number): number {
   if (!Number.isFinite(days)) return MIN_STATS_DAYS;
   return Math.min(MAX_STATS_DAYS, Math.max(MIN_STATS_DAYS, Math.floor(days)));
+}
+
+/** Validate + sanitize a free-text profile field (risk #3): coerce missing to
+ *  "", strip control chars, and reject over-length input. */
+function assertProfileText(value: unknown, field: string, maxLen: number): string {
+  if (value == null) return "";
+  if (typeof value !== "string") throw new ValidationError(`Invalid ${field}`);
+  const clean = stripControlChars(value).trim();
+  if (clean.length > maxLen) {
+    throw new ValidationError(`${field} must be at most ${maxLen} characters`);
+  }
+  return clean;
+}
+
+export function assertDisplayName(value: unknown): string {
+  return assertProfileText(value, "display name", MAX_DISPLAY_NAME_LEN);
+}
+
+export function assertBio(value: unknown): string {
+  return assertProfileText(value, "bio", MAX_BIO_LEN);
 }

@@ -2,7 +2,7 @@
 // former Postgres security-definer RPCs (specs/architecture.md).
 // All run with Admin privileges, so each validates input + enforces ownership.
 import "server-only";
-import { getAdminDb } from "./admin";
+import { getAdminDbOrThrow } from "./admin";
 import { checkRateLimit } from "./rate-limit";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
@@ -21,6 +21,8 @@ import {
   MAX_EVENTS_SCAN,
   RESERVE_HANDLE_LIMIT,
   RESERVE_HANDLE_WINDOW_MS,
+  STATS_LIMIT,
+  STATS_WINDOW_MS,
 } from "@/lib/constants";
 
 export type { Device };
@@ -34,7 +36,7 @@ export async function recordView(
   visitorHash: string,
 ): Promise<void> {
   const input = validateEventInput(profileId, referrer, device, visitorHash);
-  await getAdminDb().collection("profileViews").add({
+  await getAdminDbOrThrow().collection("profileViews").add({
     ...input,
     viewedAt: FieldValue.serverTimestamp(),
   });
@@ -54,7 +56,7 @@ export async function recordClick(
   const cleanDevice = assertDevice(device);
   const cleanHash = assertVisitorHash(visitorHash);
 
-  const db = getAdminDb();
+  const db = getAdminDbOrThrow();
   const linkRef = db.collection("links").doc(id);
   const snap = await linkRef.get();
   if (!snap.exists) return null;
@@ -91,7 +93,7 @@ export async function reserveHandle(
     RESERVE_HANDLE_WINDOW_MS,
   );
 
-  const db = getAdminDb();
+  const db = getAdminDbOrThrow();
   const ref = db.collection("handles").doc(normalized);
   try {
     await db.runTransaction(async (tx) => {
@@ -133,9 +135,11 @@ export async function getProfileStats(
   days: number,
 ): Promise<ProfileStats> {
   const pid = assertId(profileId, "profileId");
+  // Cap how often analytics can be pulled per profile (risk #5).
+  await checkRateLimit(`stats:${pid}`, STATS_LIMIT, STATS_WINDOW_MS);
   const windowDays = clampStatsDays(days);
   const since = Timestamp.fromMillis(Date.now() - windowDays * 86_400_000);
-  const db = getAdminDb();
+  const db = getAdminDbOrThrow();
 
   const [viewsSnap, clicksSnap] = await Promise.all([
     db

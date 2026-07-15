@@ -20,6 +20,8 @@ import {
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { SESSION_COOKIE } from "@/lib/constants";
+import { ServiceUnavailableError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 
 // Re-exported so existing importers keep the same API; defined once in constants (risk #9).
 export { SESSION_COOKIE };
@@ -70,4 +72,22 @@ export function getAdminAuth(): Auth {
 
 export function getAdminDb(): Firestore {
   return getFirestore(adminApp());
+}
+
+/** Run an Admin-SDK accessor, converting an init/config failure (e.g. missing
+ *  credentials) into a logged, typed ServiceUnavailableError instead of letting
+ *  a raw, cryptic SDK exception propagate. Shared by all callers that touch
+ *  Admin so error handling is consistent (risks #6–#11). */
+export function guardAdmin<T>(accessor: () => T, event: string): T {
+  try {
+    return accessor();
+  } catch (err) {
+    logger.error(event, { message: err instanceof Error ? err.message : String(err) });
+    throw new ServiceUnavailableError();
+  }
+}
+
+/** Firestore accessor with the guard applied (risks #8–#11). */
+export function getAdminDbOrThrow(): Firestore {
+  return guardAdmin(getAdminDb, "admin_db_unavailable");
 }

@@ -8,9 +8,16 @@ import {
   normalizeReferrer,
   assertHandle,
   clampStatsDays,
+  assertDisplayName,
+  assertBio,
 } from "@/lib/validation";
 import { ValidationError } from "@/lib/errors";
-import { MAX_STATS_DAYS, MIN_STATS_DAYS } from "@/lib/constants";
+import {
+  MAX_STATS_DAYS,
+  MIN_STATS_DAYS,
+  MAX_DISPLAY_NAME_LEN,
+  MAX_BIO_LEN,
+} from "@/lib/constants";
 
 describe("event input validation (risk #7)", () => {
   it("accepts and normalizes a valid event", () => {
@@ -71,5 +78,37 @@ describe("clampStatsDays (risk #6)", () => {
     expect(clampStatsDays(-5)).toBe(MIN_STATS_DAYS);
     expect(clampStatsDays(NaN)).toBe(MIN_STATS_DAYS);
     expect(clampStatsDays(3.9)).toBe(3);
+  });
+});
+
+describe("profile text validation (risk #3)", () => {
+  const NL = String.fromCharCode(10);
+
+  it("coerces missing values to empty string", () => {
+    expect(assertDisplayName(undefined)).toBe("");
+    expect(assertBio(null)).toBe("");
+  });
+
+  it("strips control chars and trims", () => {
+    expect(assertDisplayName("  Maera" + NL + "Kade  ")).toBe("MaeraKade");
+  });
+
+  it("rejects non-string input", () => {
+    expect(() => assertDisplayName(42)).toThrow(ValidationError);
+    expect(() => assertBio({})).toThrow(ValidationError);
+  });
+
+  it("rejects over-length display name and bio", () => {
+    expect(() => assertDisplayName("x".repeat(MAX_DISPLAY_NAME_LEN + 1))).toThrow(
+      ValidationError,
+    );
+    expect(() => assertBio("x".repeat(MAX_BIO_LEN + 1))).toThrow(ValidationError);
+  });
+
+  it("accepts values at the limit", () => {
+    expect(assertDisplayName("x".repeat(MAX_DISPLAY_NAME_LEN)).length).toBe(
+      MAX_DISPLAY_NAME_LEN,
+    );
+    expect(assertBio("x".repeat(MAX_BIO_LEN)).length).toBe(MAX_BIO_LEN);
   });
 });

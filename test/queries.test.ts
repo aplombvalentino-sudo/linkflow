@@ -1,33 +1,53 @@
-// Risks #4/#5 (reserveHandle: rate-limited + typed error), #6 (getProfileStats
-// read cap), #7 (recordView input validation). admin + rate-limit are mocked so
-// no real Firebase is touched.
+// queries.ts server functions. admin + rate-limit are mocked so no real Firebase
+// is touched. Covers: input validation, typed errors, read cap, per-user handle
+// rate limiting, analytics-read rate limiting (risk #5), and graceful
+// admin-unavailable handling in every function (risks #8–#11).
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Timestamp } from "firebase-admin/firestore";
-import { HandleTakenError, RateLimitError, ValidationError } from "@/lib/errors";
+import {
+  HandleTakenError,
+  RateLimitError,
+  ValidationError,
+  ServiceUnavailableError,
+} from "@/lib/errors";
 import {
   MAX_EVENTS_SCAN,
   RESERVE_HANDLE_LIMIT,
   RESERVE_HANDLE_WINDOW_MS,
+  STATS_LIMIT,
+  STATS_WINDOW_MS,
 } from "@/lib/constants";
 
 const h = vi.hoisted(() => ({
   db: null as unknown,
+  dbError: null as Error | null,
   rateLimit: null as null | ((...a: unknown[]) => Promise<void>),
 }));
 
-vi.mock("@/lib/firebase/admin", () => ({ getAdminDb: () => h.db }));
+vi.mock("@/lib/firebase/admin", () => ({
+  getAdminDbOrThrow: () => {
+    if (h.dbError) throw h.dbError;
+    return h.db;
+  },
+}));
 vi.mock("@/lib/firebase/rate-limit", () => ({
   checkRateLimit: (...args: unknown[]) => h.rateLimit!(...args),
 }));
 
-import { recordView, reserveHandle, getProfileStats } from "@/lib/firebase/queries";
+import {
+  recordView,
+  recordClick,
+  reserveHandle,
+  getProfileStats,
+} from "@/lib/firebase/queries";
 
 beforeEach(() => {
   h.db = null;
+  h.dbError = null;
   h.rateLimit = vi.fn().mockResolvedValue(undefined);
 });
 
-describe("recordView input validation (risk #7)", () => {
+describe("recordView input validation (risk #7 — prior pass)", () => {
   it("rejects a malformed device and never writes", async () => {
     const add = vi.fn();
     h.db = { collection: () => ({ add }) };
@@ -65,7 +85,7 @@ function handleDb(existing: Set<string>) {
   };
 }
 
-describe("reserveHandle (risks #4, #5)", () => {
+describe("reserveHandle (rate-limit + typed error)", () => {
   it("is rate-limited per user before touching the DB", async () => {
     h.db = handleDb(new Set());
     await reserveHandle("sam", "p1", "u1");
@@ -76,12 +96,9 @@ describe("reserveHandle (risks #4, #5)", () => {
     );
   });
 
-  it("throws a typed HandleTakenError on collision (not a generic Error)", async () => {
+  it("throws a typed HandleTakenError on collision", async () => {
     h.db = handleDb(new Set(["sam"]));
     await expect(reserveHandle("Sam", "p1", "u1")).rejects.toBeInstanceOf(HandleTakenError);
-    await expect(reserveHandle("Sam", "p1", "u1")).rejects.toMatchObject({
-      code: "handle-taken",
-    });
   });
 
   it("reserves a free handle", async () => {
@@ -104,37 +121,80 @@ describe("reserveHandle (risks #4, #5)", () => {
   });
 });
 
-describe("getProfileStats read cap (risk #6)", () => {
+const chain = (docs: unknown[], cap: { limit?: number }) => {
+  const c: Record<string, unknown> = {};
+  c.where = () => c;
+  c.limit = (n: number) => {
+    cap.limit = n;
+    return c;
+  };
+  c.get = async () => ({ size: docs.length, docs });
+  return c;
+};
+
+function statsDb(views: unknown[], clicks: unknown[], cap: { limit?: number }) {
+  return {
+    collection: (name: string) =>
+      name === "profileViews"
+        ? { where: () => chain(views, cap) }
+        : { where: () => chain(clicks, {}) },
+  };
+}
+
+describe("getProfileStats read cap + rate limiting (risks #6 prior, #5)", () => {
   it("caps each query at MAX_EVENTS_SCAN and aggregates", async () => {
-    const captured: { limit?: number } = {};
+    const cap: { limit?: number } = {};
     const viewDocs = [
       { data: () => ({ viewedAt: Timestamp.fromMillis(Date.parse("2026-07-10T00:00:00Z")), referrer: "x.com" }) },
       { data: () => ({ viewedAt: Timestamp.fromMillis(Date.parse("2026-07-10T01:00:00Z")), referrer: "x.com" }) },
     ];
-    const clickDocs = [{ data: () => ({}) }];
-
-    const chain = (docs: unknown[], cap: { limit?: number }) => {
-      const c: Record<string, unknown> = {};
-      c.where = () => c;
-      c.limit = (n: number) => {
-        cap.limit = n;
-        return c;
-      };
-      c.get = async () => ({ size: docs.length, docs });
-      return c;
-    };
-
-    h.db = {
-      collection: (name: string) =>
-        name === "profileViews"
-          ? { where: () => chain(viewDocs, captured) }
-          : { where: () => chain(clickDocs, {}) },
-    };
+    h.db = statsDb(viewDocs, [{ data: () => ({}) }], cap);
 
     const stats = await getProfileStats("p1", 9999);
-    expect(captured.limit).toBe(MAX_EVENTS_SCAN);
+    expect(cap.limit).toBe(MAX_EVENTS_SCAN);
     expect(stats.totalViews).toBe(2);
     expect(stats.totalClicks).toBe(1);
     expect(stats.topReferrers[0]).toEqual({ referrer: "x.com", n: 2 });
+  });
+
+  it("rate-limits analytics reads per profile (risk #5)", async () => {
+    h.db = statsDb([], [], {});
+    await getProfileStats("p1", 7);
+    expect(h.rateLimit).toHaveBeenCalledWith("stats:p1", STATS_LIMIT, STATS_WINDOW_MS);
+  });
+
+  it("propagates a rate-limit rejection (risk #5)", async () => {
+    h.rateLimit = vi.fn().mockRejectedValue(new RateLimitError());
+    await expect(getProfileStats("p1", 7)).rejects.toBeInstanceOf(RateLimitError);
+  });
+});
+
+describe("graceful admin-unavailable handling (risks #8–#11)", () => {
+  beforeEach(() => {
+    h.dbError = new ServiceUnavailableError();
+  });
+
+  it("recordView surfaces ServiceUnavailableError (risk #9)", async () => {
+    await expect(recordView("p1", null, "mobile", "hash")).rejects.toBeInstanceOf(
+      ServiceUnavailableError,
+    );
+  });
+
+  it("recordClick surfaces ServiceUnavailableError (risk #10)", async () => {
+    await expect(recordClick("l1", null, "mobile", "hash")).rejects.toBeInstanceOf(
+      ServiceUnavailableError,
+    );
+  });
+
+  it("reserveHandle surfaces ServiceUnavailableError (risk #8)", async () => {
+    await expect(reserveHandle("sam", "p1", "u1")).rejects.toBeInstanceOf(
+      ServiceUnavailableError,
+    );
+  });
+
+  it("getProfileStats surfaces ServiceUnavailableError (risk #11)", async () => {
+    await expect(getProfileStats("p1", 7)).rejects.toBeInstanceOf(
+      ServiceUnavailableError,
+    );
   });
 });

@@ -29,20 +29,50 @@ service cloud.firestore {
     }
 
     // Public read only when published; owner reads their drafts too.
+    // Update is field-validated (risk #1): only the editable fields may change,
+    // immutable identity fields (userId/handle) are pinned, and each value is
+    // type/size checked. affectedKeys() is used (not keys()) so unchanged fields
+    // like createdAt don't need to be listed.
     match /profiles/{profileId} {
       allow read: if resource.data.isPublished == true
                   || isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);
-      allow update, delete: if isOwner(resource.data.userId);
+      allow update: if isOwner(resource.data.userId)
+                    && request.resource.data.userId == resource.data.userId
+                    && request.resource.data.handle == resource.data.handle
+                    && request.resource.data.handleLower == resource.data.handleLower
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['displayName', 'bio', 'theme', 'isPublished', 'updatedAt'])
+                    && request.resource.data.displayName is string
+                    && request.resource.data.displayName.size() <= 80
+                    && request.resource.data.bio is string
+                    && request.resource.data.bio.size() <= 300
+                    && request.resource.data.theme in ['volt', 'violet-hour', 'ember']
+                    && request.resource.data.isPublished is bool;
+      allow delete: if isOwner(resource.data.userId);
     }
 
     // Public read only when active; owner manages all of theirs.
     // (Parent-published gating happens server-side in the SSR profile render.)
+    // Update is field-validated (risk #2). clickCount is intentionally NOT
+    // client-editable — it is incremented server-side by recordClick, so a
+    // client cannot forge it (stricter than the flagged suggestion).
     match /links/{linkId} {
       allow read: if resource.data.isActive == true
                   || isOwner(resource.data.userId);
       allow create: if isOwner(request.resource.data.userId);
-      allow update, delete: if isOwner(resource.data.userId);
+      allow update: if isOwner(resource.data.userId)
+                    && request.resource.data.userId == resource.data.userId
+                    && request.resource.data.profileId == resource.data.profileId
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['title', 'url', 'thumbnailUrl', 'position', 'isActive', 'updatedAt'])
+                    && request.resource.data.title is string
+                    && request.resource.data.title.size() <= 120
+                    && request.resource.data.url is string
+                    && request.resource.data.url.size() <= 2048
+                    && request.resource.data.isActive is bool
+                    && request.resource.data.position is int;
+      allow delete: if isOwner(resource.data.userId);
     }
 
     // Append-only analytics — Admin SDK only. No client read/write at all:

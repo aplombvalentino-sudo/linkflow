@@ -5,10 +5,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { FieldValue } from "firebase-admin/firestore";
-import { getAdminAuth, getAdminDb } from "@/lib/firebase/admin";
+import { getAdminAuth, getAdminDbOrThrow } from "@/lib/firebase/admin";
 import { mintSessionCookie } from "@/lib/firebase/auth-server";
 import { reserveHandle } from "@/lib/firebase/queries";
-import { assertHandle } from "@/lib/validation";
+import { assertHandle, assertDisplayName, assertBio } from "@/lib/validation";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { isFirebaseConfigured } from "@/lib/firebase/config";
@@ -21,7 +21,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "not-configured" }, { status: 503 });
   }
 
-  let body: { idToken?: unknown; handle?: unknown; displayName?: unknown };
+  let body: {
+    idToken?: unknown;
+    handle?: unknown;
+    displayName?: unknown;
+    bio?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -36,7 +41,7 @@ export async function POST(req: NextRequest) {
   try {
     const decoded = await getAdminAuth().verifyIdToken(idToken);
     const uid = decoded.uid;
-    const db = getAdminDb();
+    const db = getAdminDbOrThrow();
 
     const userRef = db.collection("users").doc(uid);
     const userSnap = await userRef.get();
@@ -52,14 +57,17 @@ export async function POST(req: NextRequest) {
     // then create the first profile so a collision leaves no orphan profile.
     if (typeof body.handle === "string" && body.handle.length > 0) {
       const handle = assertHandle(body.handle);
+      // Server-side validation of free-text profile fields (risk #3).
+      const displayName = assertDisplayName(body.displayName);
+      const bio = assertBio(body.bio);
       const profileRef = db.collection("profiles").doc();
       await reserveHandle(handle, profileRef.id, uid);
       await profileRef.set({
         userId: uid,
         handle,
         handleLower: handle,
-        displayName: typeof body.displayName === "string" ? body.displayName : "",
-        bio: "",
+        displayName,
+        bio,
         theme: "volt",
         isPublished: true,
         createdAt: FieldValue.serverTimestamp(),

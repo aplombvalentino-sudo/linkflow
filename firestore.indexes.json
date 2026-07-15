@@ -1,0 +1,38 @@
+{
+  "comment": "Composite indexes for LinkFlow. get_profile_stats filters events by profileId + a timestamp range, and links are ordered by position within a profile. Deploy: firebase deploy --only firestore:indexes",
+  "indexes": [
+    {
+      "collectionGroup": "profileViews",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profileId", "order": "ASCENDING" },
+        { "fieldPath": "viewedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "linkClicks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profileId", "order": "ASCENDING" },
+        { "fieldPath": "clickedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "linkClicks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "linkId", "order": "ASCENDING" },
+        { "fieldPath": "clickedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "links",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profileId", "order": "ASCENDING" },
+        { "fieldPath": "position", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

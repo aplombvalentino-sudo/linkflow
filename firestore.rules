@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// LinkFlow Firestore Security Rules — the Firebase equivalent of the former
+// Postgres RLS (specs/architecture.md). Deploy: `firebase deploy --only firestore:rules`.
+//
+// Model: users/{uid} · profiles/{profileId} · links/{linkId} · handles/{handle}
+//        · profileViews/{id} · linkClicks/{id}
+// `userId` is denormalized onto links so ownership is checkable without a join.
+// Analytics events are Admin-SDK only (no client access) — they can't be spoofed.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // 1:1 mirror of the auth user. Deletion is Admin-only (RGPD endpoint).
+    match /users/{uid} {
+      allow read, update: if isOwner(uid);
+      allow create: if isOwner(uid);
+      allow delete: if false;
+    }
+
+    // Handle reservations. Public read = availability check in signup.
+    // Writes only via the Admin-SDK transaction (reserveHandle) — never client.
+    match /handles/{handle} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Public read only when published; owner reads their drafts too.
+    match /profiles/{profileId} {
+      allow read: if resource.data.isPublished == true
+                  || isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+
+    // Public read only when active; owner manages all of theirs.
+    // (Parent-published gating happens server-side in the SSR profile render.)
+    match /links/{linkId} {
+      allow read: if resource.data.isActive == true
+                  || isOwner(resource.data.userId);
+      allow create: if isOwner(request.resource.data.userId);
+      allow update, delete: if isOwner(resource.data.userId);
+    }
+
+    // Append-only analytics — Admin SDK only. No client read/write at all:
+    // reads go through getProfileStats (server), writes through record*().
+    match /profileViews/{id} { allow read, write: if false; }
+    match /linkClicks/{id}  { allow read, write: if false; }
+  }
+}

@@ -1,26 +1,76 @@
 @import "tailwindcss";
 
+/* LinkFlow design tokens — Neon Glass Cinema (design-system/MASTER.md) */
+@theme {
+  --color-ink-950: #07070b;
+  --color-ink-900: #0d0d14;
+  --color-ink-800: #15151f;
+  --color-volt: #d4ff3f;
+  --color-violet: #7c6cff;
+  --color-ember: #ff8a3d;
+  --color-text-hi: #f4f5f0;
+  --color-text-lo: #9da1ac;
+  --color-danger: #ff5c7a;
+
+  --font-heading: var(--font-space-grotesk), ui-sans-serif, sans-serif;
+  --font-body: var(--font-dm-sans), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --glass: rgba(255, 255, 255, 0.06);
+  --glass-2: rgba(255, 255, 255, 0.09);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --volt-dim: rgba(212, 255, 63, 0.14);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ink-950);
+  color: var(--color-text-hi);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Glass elevation levels L1/L2 — MASTER.md §3 */
+@utility glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+}
+@utility glass-2 {
+  background: var(--glass-2);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
+}
+
+/* Flat glass tint — for tiles on solid surfaces where backdrop blur adds
+   nothing visually but costs a GPU layer (nested-blur perf rule) */
+@utility tile {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Volt glow — reserved for hero CTA + active nav pill */
+@utility glow-volt {
+  box-shadow: 0 0 48px var(--volt-dim);
+}
+
+::selection {
+  background: var(--color-volt);
+  color: var(--color-ink-950);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-volt);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }

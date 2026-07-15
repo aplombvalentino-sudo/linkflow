@@ -1,7 +1,14 @@
 // Firebase Admin SDK — SERVER ONLY. Never import from a Client Component.
-// The service-account private key lives in FIREBASE_PRIVATE_KEY (server env,
-// never NEXT_PUBLIC_). Admin bypasses Security Rules, so all privileged
-// reads/writes (analytics events, handle reservation, RGPD wipe) go here.
+//
+// Secrets handling (risk #3):
+//  - The service-account private key is read only from FIREBASE_PRIVATE_KEY, a
+//    server-only env var. It is NEVER prefixed with NEXT_PUBLIC_ and never logged.
+//  - On Vercel/hosting, FIREBASE_PRIVATE_KEY is stored as an encrypted env var
+//    (the platform's secret store) and injected at runtime only — it is not in
+//    the repo, the client bundle, or build output.
+//  - Initialization is LAZY: the key is touched only when a server call actually
+//    needs Admin, never at module import — so importing this file (e.g. during a
+//    credential-less CI build) can't crash or read the key.
 import "server-only";
 import {
   initializeApp,
@@ -12,22 +19,55 @@ import {
 } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { SESSION_COOKIE } from "@/lib/constants";
 
-function adminApp(): App {
-  if (getApps().length) return getApp();
-  return initializeApp({
-    credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // Vercel/dotenv store the PEM with literal "\n" — restore real newlines.
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-    }),
-  });
+// Re-exported so existing importers keep the same API; defined once in constants (risk #9).
+export { SESSION_COOKIE };
+
+interface AdminCredential {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
 }
 
-export const adminAuth: Auth = getAuth(adminApp());
-export const adminDb: Firestore = getFirestore(adminApp());
+/** Read + validate the service-account credential from server-only env vars.
+ *  Throws a clear error naming the missing var instead of a cryptic SDK failure. */
+export function getAdminCredentialConfig(): AdminCredential {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  // Vercel/dotenv store the PEM with literal "\n" — restore real newlines.
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
-/** Firebase session cookie name. `__session` is the only cookie Firebase
- *  Hosting forwards to SSR, so it is the safe cross-platform default. */
-export const SESSION_COOKIE = "__session";
+  const missing = [
+    !projectId && "FIREBASE_PROJECT_ID",
+    !clientEmail && "FIREBASE_CLIENT_EMAIL",
+    !privateKey && "FIREBASE_PRIVATE_KEY",
+  ].filter(Boolean) as string[];
+
+  if (missing.length) {
+    throw new Error(
+      `Firebase Admin is not configured — missing env: ${missing.join(", ")}`,
+    );
+  }
+  return { projectId: projectId!, clientEmail: clientEmail!, privateKey: privateKey! };
+}
+
+let cachedApp: App | undefined;
+
+function adminApp(): App {
+  if (cachedApp) return cachedApp;
+  cachedApp = getApps().length
+    ? getApp()
+    : initializeApp({ credential: cert(getAdminCredentialConfig()) });
+  return cachedApp;
+}
+
+/** Lazy accessors — the Admin app (and thus the private key) is only initialized
+ *  on first use, never at import time. */
+export function getAdminAuth(): Auth {
+  return getAuth(adminApp());
+}
+
+export function getAdminDb(): Firestore {
+  return getFirestore(adminApp());
+}

@@ -1,13 +1,14 @@
-// Next.js middleware (Edge runtime). Guards /dashboard/*.
+// Next.js middleware (Edge runtime). First-line guard for /dashboard/*.
 //
-// Firebase note: the Admin SDK can't run on the Edge, so middleware only checks
-// for the presence of the Firebase session cookie (cheap, non-cryptographic).
-// The real cryptographic verification (verifySessionCookie) happens in the
-// /dashboard server layout, which can reject a forged/expired cookie. This is
-// the standard Next.js + Firebase split — see specs/architecture.md.
+// Firebase note: the Admin SDK can't run on the Edge, so this middleware only
+// does a CHEAP presence check on the session cookie — it is deliberately NOT the
+// security boundary. The real cryptographic verification (verifySessionCookie)
+// happens in the /dashboard server layout (src/app/dashboard/layout.tsx via
+// verifySession()), which rejects any forged/expired/revoked cookie before the
+// dashboard renders. Both layers must hold; the layout is the authoritative one
+// (risk #2). This is the standard Next.js + Firebase split — see specs/architecture.md.
 import { NextResponse, type NextRequest } from "next/server";
-
-const SESSION_COOKIE = "__session";
+import { SESSION_COOKIE } from "@/lib/constants";
 
 export function middleware(request: NextRequest) {
   // Demo mode: until real Firebase credentials land in .env.local, don't gate

@@ -1,11 +1,16 @@
 "use client";
 
-// Shared auth card (login/signup). Demo mode: submits show a notice instead
-// of hitting Firebase Auth until credentials are configured — MASTER.md §5 forms.
+// Shared auth card (login/signup). Performs REAL Firebase auth via submitAuth
+// when configured; falls back to the demo notice (no fake login) when Firebase
+// isn't set up — demo detection is centralized in isFirebaseConfigured (risks
+// #1, #8). MASTER.md §5 forms.
 import { useState } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
+import { submitAuth } from "@/lib/firebase/auth-client";
+
+type Status = "idle" | "loading" | "demo" | "error";
 
 export function AuthCard({
   mode,
@@ -17,7 +22,35 @@ export function AuthCard({
   subtitle: string;
 }) {
   const reduceMotion = useReducedMotion();
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    setStatus("loading");
+    setErrorMessage("");
+
+    const result = await submitAuth({
+      mode,
+      email: String(form.get("email") ?? ""),
+      password: String(form.get("password") ?? ""),
+      handle: mode === "signup" ? String(form.get("handle") ?? "") : undefined,
+    });
+
+    if (result.ok) {
+      const params = new URLSearchParams(window.location.search);
+      const to = params.get("redirectedFrom") ?? "/dashboard";
+      window.location.assign(to);
+      return;
+    }
+    if (result.code === "demo") {
+      setStatus("demo");
+      return;
+    }
+    setStatus("error");
+    setErrorMessage(result.message ?? "Something went wrong. Try again.");
+  }
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-6">
@@ -40,13 +73,7 @@ export function AuthCard({
         <h1 className="mt-5 font-heading text-3xl font-bold">{title}</h1>
         <p className="mt-2 text-sm leading-relaxed text-text-lo">{subtitle}</p>
 
-        <form
-          className="mt-7 flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSubmitted(true);
-          }}
-        >
+        <form className="mt-7 flex flex-col gap-4" onSubmit={handleSubmit}>
           {mode === "signup" && (
             <div>
               <label htmlFor="handle" className="mb-1.5 block font-mono text-xs uppercase tracking-wider text-text-lo">
@@ -93,15 +120,25 @@ export function AuthCard({
           </div>
           <button
             type="submit"
-            className="mt-2 h-12 cursor-pointer rounded-full bg-volt font-heading font-semibold text-ink-950 transition-[filter] duration-150 hover:brightness-105 active:scale-[0.98]"
+            disabled={status === "loading"}
+            className="mt-2 h-12 cursor-pointer rounded-full bg-volt font-heading font-semibold text-ink-950 transition-[filter] duration-150 hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {mode === "signup" ? "Claim it — free" : "Log in"}
+            {status === "loading"
+              ? "One sec…"
+              : mode === "signup"
+                ? "Claim it — free"
+                : "Log in"}
           </button>
         </form>
 
-        {submitted && (
+        {status === "demo" && (
           <p role="status" className="mt-4 rounded-xl bg-volt/10 px-4 py-3 text-center font-mono text-xs text-volt">
             Demo mode — connect Firebase in .env.local to enable real accounts.
+          </p>
+        )}
+        {status === "error" && (
+          <p role="alert" className="mt-4 rounded-xl bg-danger/10 px-4 py-3 text-center font-mono text-xs text-danger">
+            {errorMessage}
           </p>
         )}
 

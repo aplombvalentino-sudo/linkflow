@@ -10,6 +10,9 @@ import {
   clampStatsDays,
   assertDisplayName,
   assertBio,
+  assertTheme,
+  assertIsPublished,
+  handleValidationError,
 } from "@/lib/validation";
 import { ValidationError } from "@/lib/errors";
 import {
@@ -17,6 +20,7 @@ import {
   MIN_STATS_DAYS,
   MAX_DISPLAY_NAME_LEN,
   MAX_BIO_LEN,
+  THEMES,
 } from "@/lib/constants";
 
 describe("event input validation (risk #7)", () => {
@@ -110,5 +114,59 @@ describe("profile text validation (risk #3)", () => {
       MAX_DISPLAY_NAME_LEN,
     );
     expect(assertBio("x".repeat(MAX_BIO_LEN)).length).toBe(MAX_BIO_LEN);
+  });
+});
+
+describe("assertTheme / assertIsPublished (risk #2)", () => {
+  it("falls back to the given default when omitted, preserving today's behavior", () => {
+    expect(assertTheme(undefined, "volt")).toBe("volt");
+    expect(assertTheme(null, "volt")).toBe("volt");
+    expect(assertIsPublished(undefined, true)).toBe(true);
+    expect(assertIsPublished(null, true)).toBe(true);
+  });
+
+  it("accepts any known theme", () => {
+    for (const t of THEMES) expect(assertTheme(t, "volt")).toBe(t);
+  });
+
+  it("rejects an unknown or non-string theme", () => {
+    expect(() => assertTheme("neon-nonexistent", "volt")).toThrow(ValidationError);
+    expect(() => assertTheme(42, "volt")).toThrow(ValidationError);
+  });
+
+  it("accepts real booleans for isPublished", () => {
+    expect(assertIsPublished(true, false)).toBe(true);
+    expect(assertIsPublished(false, true)).toBe(false);
+  });
+
+  it("rejects a non-boolean isPublished (e.g. a truthy string)", () => {
+    expect(() => assertIsPublished("true", false)).toThrow(ValidationError);
+    expect(() => assertIsPublished(1, false)).toThrow(ValidationError);
+  });
+});
+
+describe("handleValidationError (risk #5 — client-safe handle check)", () => {
+  it("returns null for an empty (untouched) field", () => {
+    expect(handleValidationError("")).toBeNull();
+  });
+
+  it("returns null for a valid handle", () => {
+    expect(handleValidationError("maera.fit")).toBeNull();
+  });
+
+  it("returns the exact assertHandle message for an invalid handle", () => {
+    expect(handleValidationError("a")).toBe(
+      (() => {
+        try {
+          assertHandle("a");
+        } catch (e) {
+          return (e as ValidationError).message;
+        }
+      })(),
+    );
+  });
+
+  it("flags reserved handles", () => {
+    expect(handleValidationError("dashboard")).toMatch(/reserved/i);
   });
 });

@@ -18,9 +18,16 @@ describe("profiles update rule is field-validated (risk #1)", () => {
       ".hasOnly(['displayName', 'bio', 'theme', 'isPublished', 'updatedAt'])",
     );
   });
-  it("pins immutable identity fields", () => {
+  it("pins immutable identity fields, including handleLower", () => {
     expect(rules).toContain("request.resource.data.userId == resource.data.userId");
     expect(rules).toContain("request.resource.data.handle == resource.data.handle");
+    expect(rules).toContain("request.resource.data.handleLower == resource.data.handleLower");
+  });
+  it("hard-denies handleLower/handle/userId/createdAt from ever appearing in an update diff", () => {
+    // Explicit, redundant guard on top of the equality pins + hasOnly list —
+    // fails closed even if a future edit weakens one of those (risk #1).
+    expect(rules).toContain("!request.resource.data.diff(resource.data).affectedKeys()");
+    expect(rules).toContain(".hasAny(['handleLower', 'handle', 'userId', 'createdAt'])");
   });
   it("type/size checks the content fields", () => {
     expect(rules).toContain("request.resource.data.displayName is string");

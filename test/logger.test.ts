@@ -44,3 +44,28 @@ describe("logger sanitization (risk #4)", () => {
     spy.mockRestore();
   });
 });
+
+describe("logger sanitizes the `event` parameter itself (risk #3)", () => {
+  it("strips control chars from a forged event string and stays one JSON line", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // simulates an event string built (however indirectly) from attacker input
+    const forgedEvent = "real_event" + NL + '{"level":"admin","injected":true}';
+    logger.error(forgedEvent, {});
+    const out = spy.mock.calls[0][0] as string;
+
+    expect(out.split(NL)).toHaveLength(1);
+    const parsed = JSON.parse(out);
+    expect(parsed.event).not.toContain(NL);
+    expect(parsed.injected).toBeUndefined(); // never escaped into a sibling key
+    expect(parsed.level).toBe("error"); // untampered by the injected event text
+    spy.mockRestore();
+  });
+
+  it("caps an oversized event string", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    logger.warn("x".repeat(MAX_LOG_STRING_LEN + 500));
+    const parsed = JSON.parse(spy.mock.calls[0][0] as string);
+    expect(parsed.event.length).toBe(MAX_LOG_STRING_LEN);
+    spy.mockRestore();
+  });
+});

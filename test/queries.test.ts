@@ -132,13 +132,39 @@ const chain = (docs: unknown[], cap: { limit?: number }) => {
   return c;
 };
 
-function statsDb(views: unknown[], clicks: unknown[], cap: { limit?: number }) {
-  return {
-    collection: (name: string) =>
-      name === "profileViews"
+/** Mocks profileViews/linkClicks queries plus a statsCache doc store (Map-backed,
+ *  shared across calls in a test so a "set" from one call is visible to the
+ *  next "get"). `queryCalls` counts how many times the big collections were
+ *  actually queried, so cache-hit tests can assert they were skipped. */
+function statsDb(
+  views: unknown[],
+  clicks: unknown[],
+  cap: { limit?: number },
+  cacheStore: Map<string, { stats: unknown; computedAtMs: number }> = new Map(),
+) {
+  const queryCalls = { count: 0 };
+  const db = {
+    collection: (name: string) => {
+      if (name === "statsCache") {
+        return {
+          doc: (id: string) => ({
+            get: async () => ({
+              exists: cacheStore.has(id),
+              data: () => cacheStore.get(id),
+            }),
+            set: async (value: { stats: unknown; computedAtMs: number }) => {
+              cacheStore.set(id, value);
+            },
+          }),
+        };
+      }
+      queryCalls.count++;
+      return name === "profileViews"
         ? { where: () => chain(views, cap) }
-        : { where: () => chain(clicks, {}) },
+        : { where: () => chain(clicks, {}) };
+    },
   };
+  return { db, cacheStore, queryCalls };
 }
 
 describe("getProfileStats read cap + rate limiting (risks #6 prior, #5)", () => {
@@ -148,7 +174,7 @@ describe("getProfileStats read cap + rate limiting (risks #6 prior, #5)", () => 
       { data: () => ({ viewedAt: Timestamp.fromMillis(Date.parse("2026-07-10T00:00:00Z")), referrer: "x.com" }) },
       { data: () => ({ viewedAt: Timestamp.fromMillis(Date.parse("2026-07-10T01:00:00Z")), referrer: "x.com" }) },
     ];
-    h.db = statsDb(viewDocs, [{ data: () => ({}) }], cap);
+    h.db = statsDb(viewDocs, [{ data: () => ({}) }], cap).db;
 
     const stats = await getProfileStats("p1", 9999);
     expect(cap.limit).toBe(MAX_EVENTS_SCAN);
@@ -158,7 +184,7 @@ describe("getProfileStats read cap + rate limiting (risks #6 prior, #5)", () => 
   });
 
   it("rate-limits analytics reads per profile (risk #5)", async () => {
-    h.db = statsDb([], [], {});
+    h.db = statsDb([], [], {}).db;
     await getProfileStats("p1", 7);
     expect(h.rateLimit).toHaveBeenCalledWith("stats:p1", STATS_LIMIT, STATS_WINDOW_MS);
   });
@@ -166,6 +192,45 @@ describe("getProfileStats read cap + rate limiting (risks #6 prior, #5)", () => 
   it("propagates a rate-limit rejection (risk #5)", async () => {
     h.rateLimit = vi.fn().mockRejectedValue(new RateLimitError());
     await expect(getProfileStats("p1", 7)).rejects.toBeInstanceOf(RateLimitError);
+  });
+});
+
+describe("getProfileStats result caching (risk #4)", () => {
+  it("a second call within the TTL reuses the cache and skips the big queries", async () => {
+    const { db, queryCalls } = statsDb([], [], {});
+    h.db = db;
+
+    await getProfileStats("p1", 7);
+    const firstCallQueries = queryCalls.count;
+    expect(firstCallQueries).toBeGreaterThan(0);
+
+    await getProfileStats("p1", 7);
+    // no additional profileViews/linkClicks queries on the cache hit
+    expect(queryCalls.count).toBe(firstCallQueries);
+  });
+
+  it("recomputes once the cache entry is expired", async () => {
+    const cacheStore = new Map<string, { stats: unknown; computedAtMs: number }>();
+    const { db, queryCalls } = statsDb([], [], {}, cacheStore);
+    h.db = db;
+
+    await getProfileStats("p1", 7);
+    const afterFirst = queryCalls.count;
+
+    // simulate an expired cache entry
+    const key = [...cacheStore.keys()][0];
+    cacheStore.set(key, { ...cacheStore.get(key)!, computedAtMs: Date.now() - 10 * 60_000 });
+
+    await getProfileStats("p1", 7);
+    expect(queryCalls.count).toBeGreaterThan(afterFirst);
+  });
+
+  it("different windows (days) get independent cache entries", async () => {
+    const { db, cacheStore } = statsDb([], [], {});
+    h.db = db;
+    await getProfileStats("p1", 7);
+    await getProfileStats("p1", 30);
+    expect(cacheStore.size).toBe(2);
   });
 });
 

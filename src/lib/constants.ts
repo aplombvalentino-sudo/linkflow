@@ -19,6 +19,10 @@ export const DEVICES = ["mobile", "tablet", "desktop"] as const;
 export const MAX_DISPLAY_NAME_LEN = 80;
 export const MAX_BIO_LEN = 300;
 
+// ---- profile theme (risk #2). Keep in sync with the literal list in
+// firestore.rules' `theme in [...]` check — Security Rules can't import JS. ----
+export const THEMES = ["volt", "violet-hour", "ember"] as const;
+
 // ---- logging (risk #4) ----
 export const MAX_LOG_STRING_LEN = 2000;
 
@@ -45,3 +49,8 @@ export const RESERVE_HANDLE_WINDOW_MS = 10 * 60 * 1000;
 // Analytics reads: cap how often stats can be pulled per profile (risk #5).
 export const STATS_LIMIT = 60;
 export const STATS_WINDOW_MS = 60 * 1000;
+// getProfileStats result cache TTL (risk #4 — architecture): reuses a computed
+// aggregate instead of re-scanning up to 2×MAX_EVENTS_SCAN docs on every call
+// within the window. Matched to STATS_WINDOW_MS so a client polling at the
+// rate-limit's own cadence gets a fresh compute roughly once per window.
+export const STATS_CACHE_TTL_MS = STATS_WINDOW_MS;

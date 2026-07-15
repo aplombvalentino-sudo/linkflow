@@ -14,6 +14,7 @@ import {
   MAX_STATS_DAYS,
   MAX_DISPLAY_NAME_LEN,
   MAX_BIO_LEN,
+  THEMES,
 } from "./constants";
 import { ValidationError } from "./errors";
 import { stripControlChars } from "./sanitize";
@@ -128,4 +129,41 @@ export function assertDisplayName(value: unknown): string {
 
 export function assertBio(value: unknown): string {
   return assertProfileText(value, "bio", MAX_BIO_LEN);
+}
+
+export type Theme = (typeof THEMES)[number];
+
+/** Validate a profile theme (risk #2): must be one of the known values.
+ *  `fallback` is returned for missing input (undefined/null) so existing
+ *  callers that don't send a theme keep today's default behavior. */
+export function assertTheme(value: unknown, fallback: Theme): Theme {
+  if (value == null) return fallback;
+  if (typeof value !== "string" || !(THEMES as readonly string[]).includes(value)) {
+    throw new ValidationError(`theme must be one of: ${THEMES.join(", ")}`);
+  }
+  return value as Theme;
+}
+
+/** Validate the isPublished flag (risk #2): must be a real boolean.
+ *  `fallback` is returned for missing input so existing callers keep today's
+ *  default behavior. */
+export function assertIsPublished(value: unknown, fallback: boolean): boolean {
+  if (value == null) return fallback;
+  if (typeof value !== "boolean") {
+    throw new ValidationError("isPublished must be a boolean");
+  }
+  return value;
+}
+
+/** Client-safe (and server-safe) handle check that reuses assertHandle's exact
+ *  rules — no duplicated regex/length logic to drift out of sync (risk #5).
+ *  Returns null when valid, or a user-facing message when not. */
+export function handleValidationError(raw: string): string | null {
+  if (raw.length === 0) return null; // don't nag on an empty/untouched field
+  try {
+    assertHandle(raw);
+    return null;
+  } catch (err) {
+    return err instanceof ValidationError ? err.message : "Invalid handle";
+  }
 }

@@ -14,9 +14,14 @@ function sanitizeValue(value: unknown): unknown {
     : value;
 }
 
+// vibeguard-treated(security): Potential for Log Forgery via Unsanitized `event` Parameter
 function emit(level: "info" | "warn" | "error", event: string, ctx?: Ctx) {
+  // `event` is sanitized directly (not just via the JSON.stringify replacer)
+  // so every call site is covered even if one is ever built from user input —
+  // defense in depth alongside the ctx-value sanitization above (risk #3).
+  const cleanEvent = clampText(stripControlChars(event), MAX_LOG_STRING_LEN);
   const line = JSON.stringify(
-    { level, event, ...ctx, ts: new Date().toISOString() },
+    { level, event: cleanEvent, ...ctx, ts: new Date().toISOString() },
     (_key, value) => sanitizeValue(value),
   );
   if (level === "error") console.error(line);

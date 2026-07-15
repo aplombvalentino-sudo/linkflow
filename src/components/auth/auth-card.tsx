@@ -9,6 +9,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { submitAuth } from "@/lib/firebase/auth-client";
+import { handleValidationError } from "@/lib/validation";
 
 type Status = "idle" | "loading" | "demo" | "error";
 
@@ -24,10 +25,25 @@ export function AuthCard({
   const reduceMotion = useReducedMotion();
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  // Live client-side handle feedback, reusing the exact server-side rules via
+  // handleValidationError (risk #5) — improves UX and cuts pointless requests
+  // for obviously-invalid handles; the server (assertHandle) stays authoritative.
+  // vibeguard-treated(tests): Lack of Client-Side Input Validation for Handle Length/Format
+  const [handleError, setHandleError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
+    const handle = mode === "signup" ? String(form.get("handle") ?? "") : "";
+
+    if (mode === "signup") {
+      const err = handleValidationError(handle);
+      if (err) {
+        setHandleError(err);
+        return; // don't hit the server for an already-known-invalid handle
+      }
+    }
+
     setStatus("loading");
     setErrorMessage("");
 
@@ -35,7 +51,7 @@ export function AuthCard({
       mode,
       email: String(form.get("email") ?? ""),
       password: String(form.get("password") ?? ""),
-      handle: mode === "signup" ? String(form.get("handle") ?? "") : undefined,
+      handle: mode === "signup" ? handle : undefined,
     });
 
     if (result.ok) {
@@ -79,7 +95,11 @@ export function AuthCard({
               <label htmlFor="handle" className="mb-1.5 block font-mono text-xs uppercase tracking-wider text-text-lo">
                 Your handle
               </label>
-              <div className="flex items-center rounded-xl border border-white/15 bg-ink-800 focus-within:border-volt">
+              <div
+                className={`flex items-center rounded-xl border bg-ink-800 focus-within:border-volt ${
+                  handleError ? "border-danger" : "border-white/15"
+                }`}
+              >
                 <span className="pl-4 font-mono text-sm text-text-lo">@</span>
                 <input
                   id="handle"
@@ -87,9 +107,18 @@ export function AuthCard({
                   type="text"
                   required
                   placeholder="maera.fit"
+                  aria-invalid={handleError ? true : undefined}
+                  aria-describedby={handleError ? "handle-error" : undefined}
+                  onChange={(e) => setHandleError(handleValidationError(e.currentTarget.value))}
+                  onBlur={(e) => setHandleError(handleValidationError(e.currentTarget.value))}
                   className="w-full bg-transparent px-2 py-3 text-sm outline-none placeholder:text-text-lo/50"
                 />
               </div>
+              {handleError && (
+                <p id="handle-error" role="alert" className="mt-1.5 text-xs text-danger">
+                  {handleError}
+                </p>
+              )}
             </div>
           )}
           <div>

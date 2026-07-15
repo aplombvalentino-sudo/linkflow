@@ -26,3 +26,9 @@ yarn-error.log*
 coverage
 next-env.d.ts
 *.tsbuildinfo
+
+# playwright
+test-results
+playwright-report
+blob-report
+playwright/.cache

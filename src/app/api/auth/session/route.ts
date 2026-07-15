@@ -8,7 +8,13 @@ import { FieldValue } from "firebase-admin/firestore";
 import { getAdminAuth, getAdminDbOrThrow } from "@/lib/firebase/admin";
 import { mintSessionCookie } from "@/lib/firebase/auth-server";
 import { reserveHandle } from "@/lib/firebase/queries";
-import { assertHandle, assertDisplayName, assertBio } from "@/lib/validation";
+import {
+  assertHandle,
+  assertDisplayName,
+  assertBio,
+  assertTheme,
+  assertIsPublished,
+} from "@/lib/validation";
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { isFirebaseConfigured } from "@/lib/firebase/config";
@@ -26,6 +32,8 @@ export async function POST(req: NextRequest) {
     handle?: unknown;
     displayName?: unknown;
     bio?: unknown;
+    theme?: unknown;
+    isPublished?: unknown;
   };
   try {
     body = await req.json();
@@ -57,9 +65,16 @@ export async function POST(req: NextRequest) {
     // then create the first profile so a collision leaves no orphan profile.
     if (typeof body.handle === "string" && body.handle.length > 0) {
       const handle = assertHandle(body.handle);
-      // Server-side validation of free-text profile fields (risk #3).
+      // Server-side validation of free-text + enum/boolean profile fields.
+      // theme/isPublished fall back to today's defaults (volt/true) when the
+      // caller doesn't send them, so existing behavior is unchanged; if sent,
+      // they're strictly validated so a signup request can't set an invalid
+      // theme or an unauthorized isPublished value (risk #2).
+      // vibeguard-treated(security): Missing Server-Side Validation for Profile Fields in /api/auth/session
       const displayName = assertDisplayName(body.displayName);
       const bio = assertBio(body.bio);
+      const theme = assertTheme(body.theme, "volt");
+      const isPublished = assertIsPublished(body.isPublished, true);
       const profileRef = db.collection("profiles").doc();
       await reserveHandle(handle, profileRef.id, uid);
       await profileRef.set({
@@ -68,8 +83,8 @@ export async function POST(req: NextRequest) {
         handleLower: handle,
         displayName,
         bio,
-        theme: "volt",
-        isPublished: true,
+        theme,
+        isPublished,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });

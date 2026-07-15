@@ -29,10 +29,18 @@ service cloud.firestore {
     }
 
     // Public read only when published; owner reads their drafts too.
-    // Update is field-validated (risk #1): only the editable fields may change,
-    // immutable identity fields (userId/handle) are pinned, and each value is
-    // type/size checked. affectedKeys() is used (not keys()) so unchanged fields
-    // like createdAt don't need to be listed.
+    // Update is field-validated: only the editable fields may change, and each
+    // value is type/size checked. affectedKeys() is used (not keys()) so
+    // unchanged fields like createdAt don't need to be listed.
+    //
+    // Identity fields (userId/handle/handleLower/createdAt) are immutable on
+    // update. They were already pinned via per-field equality checks; the
+    // hasAny() guard below is an explicit, redundant belt-and-suspenders layer
+    // that fails closed even if a future edit ever weakened/removed one of the
+    // equality pins or accidentally widened hasOnly() — handleLower in
+    // particular denormalizes the uniqueness lock in handles/{handleLower}, so
+    // it must never be independently client-writable (risk #1).
+    // vibeguard-treated(security): Incomplete Firestore Security Rules for Profile Updates
     match /profiles/{profileId} {
       allow read: if resource.data.isPublished == true
                   || isOwner(resource.data.userId);
@@ -41,6 +49,8 @@ service cloud.firestore {
                     && request.resource.data.userId == resource.data.userId
                     && request.resource.data.handle == resource.data.handle
                     && request.resource.data.handleLower == resource.data.handleLower
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                         .hasAny(['handleLower', 'handle', 'userId', 'createdAt'])
                     && request.resource.data.diff(resource.data).affectedKeys()
                          .hasOnly(['displayName', 'bio', 'theme', 'isPublished', 'updatedAt'])
                     && request.resource.data.displayName is string
@@ -79,5 +89,9 @@ service cloud.firestore {
     // reads go through getProfileStats (server), writes through record*().
     match /profileViews/{id} { allow read, write: if false; }
     match /linkClicks/{id}  { allow read, write: if false; }
+
+    // Short-TTL analytics aggregate cache (risk #4 architecture mitigation) —
+    // Admin SDK only, same as the raw event collections above.
+    match /statsCache/{id} { allow read, write: if false; }
   }
 }

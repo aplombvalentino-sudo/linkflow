@@ -23,7 +23,9 @@ import {
   RESERVE_HANDLE_WINDOW_MS,
   STATS_LIMIT,
   STATS_WINDOW_MS,
+  STATS_CACHE_TTL_MS,
 } from "@/lib/constants";
+import type { Firestore } from "firebase-admin/firestore";
 
 export type { Device };
 
@@ -126,20 +128,66 @@ export interface ProfileStats {
   topReferrers: { referrer: string; n: number }[];
 }
 
+interface StatsCacheDoc {
+  stats: ProfileStats;
+  computedAtMs: number;
+}
+
+function statsCacheKey(profileId: string, windowDays: number): string {
+  return `${profileId}_${windowDays}`;
+}
+
+/** Read a still-fresh cached aggregate, or null if missing/expired. Uses a
+ *  process-measured `computedAtMs` (not FieldValue.serverTimestamp()) so the
+ *  TTL comparison stays internally consistent even under host clock skew — the
+ *  same process measures both the write and the elapsed time since. */
+async function getCachedStats(
+  db: Firestore,
+  cacheKey: string,
+): Promise<ProfileStats | null> {
+  const snap = await db.collection("statsCache").doc(cacheKey).get();
+  if (!snap.exists) return null;
+  const data = snap.data() as StatsCacheDoc;
+  if (Date.now() - data.computedAtMs > STATS_CACHE_TTL_MS) return null;
+  return data.stats;
+}
+
+async function setCachedStats(
+  db: Firestore,
+  cacheKey: string,
+  stats: ProfileStats,
+): Promise<void> {
+  await db
+    .collection("statsCache")
+    .doc(cacheKey)
+    .set({ stats, computedAtMs: Date.now() } satisfies StatsCacheDoc);
+}
+
 /** get_profile_stats — Firestore has no SQL aggregation, so we read the event
  *  window via Admin and fold it in JS. The window is clamped and each query is
- *  capped at MAX_EVENTS_SCAN docs so a hot profile can't run up unbounded reads
- *  (risk #6). Ownership is checked by the caller. */
+ *  capped at MAX_EVENTS_SCAN docs so a hot profile can't run up unbounded reads.
+ *  A short-TTL cache (risk #4) additionally avoids re-scanning the event window
+ *  on every call within STATS_CACHE_TTL_MS — a dashboard polling for updates
+ *  reuses the same computed aggregate instead of paying the full read+fold cost
+ *  each time. Full pre-aggregation via Cloud Functions/BigQuery remains the
+ *  further scale-up path for very high event volumes. Ownership is checked by
+ *  the caller.
+ *  vibeguard-treated(architecture): Analytics Data Aggregation Performance Risk */
 export async function getProfileStats(
   profileId: string,
   days: number,
 ): Promise<ProfileStats> {
   const pid = assertId(profileId, "profileId");
-  // Cap how often analytics can be pulled per profile (risk #5).
+  // Cap how often analytics can be pulled per profile.
   await checkRateLimit(`stats:${pid}`, STATS_LIMIT, STATS_WINDOW_MS);
   const windowDays = clampStatsDays(days);
-  const since = Timestamp.fromMillis(Date.now() - windowDays * 86_400_000);
   const db = getAdminDbOrThrow();
+  const cacheKey = statsCacheKey(pid, windowDays);
+
+  const cached = await getCachedStats(db, cacheKey);
+  if (cached) return cached;
+
+  const since = Timestamp.fromMillis(Date.now() - windowDays * 86_400_000);
 
   const [viewsSnap, clicksSnap] = await Promise.all([
     db
@@ -165,7 +213,7 @@ export async function getProfileStats(
     if (d.referrer) refMap.set(d.referrer, (refMap.get(d.referrer) ?? 0) + 1);
   }
 
-  return {
+  const stats: ProfileStats = {
     totalViews: viewsSnap.size,
     totalClicks: clicksSnap.size,
     daily: [...dayMap.entries()]
@@ -176,4 +224,7 @@ export async function getProfileStats(
       .sort((a, b) => b.n - a.n)
       .slice(0, 5),
   };
+
+  await setCachedStats(db, cacheKey, stats);
+  return stats;
 }

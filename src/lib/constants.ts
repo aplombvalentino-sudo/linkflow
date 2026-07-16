@@ -43,6 +43,13 @@ export const MAX_STATS_DAYS = 90;
  *  (Cloud Functions / BigQuery) is the path beyond this. */
 export const MAX_EVENTS_SCAN = 50_000;
 
+// ---- billing (Pro plan) ----
+export const PRO_PRICE_CENTS = 900; // €9/mo, matches product-onepager.md + landing copy
+export const PRO_CURRENCY = "eur";
+export const PRO_PRODUCT_NAME = "LinkFlow Pro";
+export const CHECKOUT_LIMIT = 5;
+export const CHECKOUT_WINDOW_MS = 60 * 1000;
+
 // ---- rate limiting ----
 export const RESERVE_HANDLE_LIMIT = 10;
 export const RESERVE_HANDLE_WINDOW_MS = 10 * 60 * 1000;

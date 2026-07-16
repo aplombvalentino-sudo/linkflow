@@ -6,10 +6,47 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const rules = readFileSync(
+const rawRules = readFileSync(
   fileURLToPath(new URL("../firestore.rules", import.meta.url)),
   "utf8",
-).replace(/\s+/g, " ");
+);
+const rules = rawRules.replace(/\s+/g, " ");
+
+/** Extract just the `match /<name>/{...}` block's body for precise, non-false-
+ *  positive assertions (rather than searching the whole flattened file). */
+function ruleBlock(matchPath: string): string {
+  const header = `match /${matchPath}`;
+  const start = rawRules.indexOf(header);
+  if (start === -1) throw new Error(`No "match /${matchPath}" block found`);
+  // Search for the body-opening "{" AFTER the header text — matchPath itself
+  // contains literal braces (e.g. "{uid}"), so searching from `start` would
+  // find that brace instead of the rule body's.
+  let depth = 0;
+  let i = rawRules.indexOf("{", start + header.length);
+  const bodyStart = i;
+  for (; i < rawRules.length; i++) {
+    if (rawRules[i] === "{") depth++;
+    else if (rawRules[i] === "}") {
+      depth--;
+      if (depth === 0) break;
+    }
+  }
+  return rawRules.slice(bodyStart, i + 1).replace(/\s+/g, " ");
+}
+
+describe("users/{uid} update/delete are fully locked (billing self-upgrade gap)", () => {
+  it("allows the owner to read and create their own doc", () => {
+    const block = ruleBlock("users/{uid}");
+    expect(block).toContain("allow read: if isOwner(uid)");
+    expect(block).toContain("allow create: if isOwner(uid)");
+  });
+  it("denies ALL client updates and deletes — plan/stripeCustomerId are server-only", () => {
+    const block = ruleBlock("users/{uid}");
+    expect(block).toContain("allow update, delete: if false");
+    // the old unrestricted rule must be gone, not just supplemented
+    expect(block).not.toMatch(/allow\s+read,\s*update:\s*if\s+isOwner/);
+  });
+});
 
 describe("profiles update rule is field-validated (risk #1)", () => {
   it("restricts updatable fields via affectedKeys().hasOnly", () => {

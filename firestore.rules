@@ -14,11 +14,19 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
 
-    // 1:1 mirror of the auth user. Deletion is Admin-only (RGPD endpoint).
+    // 1:1 mirror of the auth user. Every field here (email, plan,
+    // stripeCustomerId, createdAt) is server-managed — email from Firebase
+    // Auth at signup, plan/stripeCustomerId only from the Stripe webhook.
+    // Nothing on this doc is legitimately client-editable, so update is fully
+    // locked (not just field-validated): before billing existed, `update: if
+    // isOwner(uid)` let any signed-in user set their OWN plan to "pro" via a
+    // raw client write — a real self-upgrade/revenue-loss hole once Stripe is
+    // wired up. Creation on signup and plan sync on payment both go through
+    // the Admin SDK, which bypasses rules entirely, so this costs nothing.
     match /users/{uid} {
-      allow read, update: if isOwner(uid);
+      allow read: if isOwner(uid);
       allow create: if isOwner(uid);
-      allow delete: if false;
+      allow update, delete: if false;
     }
 
     // Handle reservations. Public read = availability check in signup.

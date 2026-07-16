@@ -16,11 +16,11 @@ vi.mock("@/lib/stripe/admin", () => ({
   isStripeConfigured: () => h.configured,
 }));
 
+import { POST } from "@/app/api/stripe/webhook/route";
 import {
-  POST,
   handleCheckoutCompleted,
   handleSubscriptionDeleted,
-} from "@/app/api/stripe/webhook/route";
+} from "@/lib/stripe/webhook-handlers";
 
 function fakeRequest(body: string, signature: string | null): Request {
   return {

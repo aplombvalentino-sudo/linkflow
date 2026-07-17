@@ -1,0 +1,11 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // The Admin SDK (server-only) bypasses these rules entirely — every
+    // upload goes through /api/upload, which is session-gated and
+    // ownership-checked. Direct client access is denied.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

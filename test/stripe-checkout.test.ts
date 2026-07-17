@@ -90,6 +90,13 @@ describe("POST /api/stripe/checkout", () => {
     );
   });
 
+  it("enables the promotion-code field at checkout", async () => {
+    await POST();
+    expect(h.checkoutCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ allow_promotion_codes: true }),
+    );
+  });
+
   it("returns the Stripe-hosted checkout URL on success", async () => {
     const res = await POST();
     expect(res.status).toBe(200);

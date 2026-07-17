@@ -75,6 +75,15 @@ export async function POST() {
           quantity: 1,
         },
       ],
+      // Shows a "Add promotion code" field at checkout (code: "linkflow", 99%
+      // off the first cycle — promo_1TuGKXLulvLAX2MZjRNFMJHG / coupon
+      // linkflows99). NOT auto-applied via `discounts`: that field is
+      // mutually exclusive with allow_promotion_codes, and this code is
+      // restricted to first_time_transaction — auto-applying it would throw
+      // at session-creation time for a returning customer re-subscribing
+      // after a downgrade, breaking their checkout entirely. Letting the
+      // customer opt in themselves is the only form that's safe for everyone.
+      allow_promotion_codes: true,
       success_url: `${appUrl}/dashboard?upgraded=1`,
       cancel_url: `${appUrl}/dashboard`,
     });

@@ -21,6 +21,11 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
+  // Resolves relative OG/canonical URLs. Falls back to the production domain
+  // so this stays correct even before NEXT_PUBLIC_APP_URL is flipped in Vercel
+  // (metadataBase only affects link/meta tags, never a live redirect — safe to
+  // set ahead of DNS being ready, unlike the Stripe checkout redirect).
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://linkflows.xyz"),
   title: "LinkFlow — Your link is a stage",
   description:
     "LinkFlow turns the link in your bio into an animated, on-brand profile — with analytics you'll actually read. Free forever, live in 60 seconds.",

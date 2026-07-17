@@ -273,7 +273,7 @@ function QrVisual() {
         ))}
       </svg>
       <p className="mt-4 text-center font-mono text-[10px] uppercase tracking-widest text-text-lo">
-        linkflow.app/@maera.fit
+        linkflows.xyz/@maera.fit
       </p>
     </div>
   );

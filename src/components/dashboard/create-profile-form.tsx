@@ -1,7 +1,7 @@
 "use client";
 
 // Compact "claim a page" form used on the dashboard: a handle field with a
-// linkflow.to/ adornment, an optional display name, live handle validation,
+// linkflows.xyz/ adornment, an optional display name, live handle validation,
 // and a create button that routes to the new profile's editor on success.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -48,7 +48,7 @@ export function CreateProfileForm() {
       </label>
       <div className="mt-2 flex items-center rounded-2xl border border-white/10 bg-ink-800 px-4 transition-colors focus-within:border-volt/50">
         <span className="shrink-0 font-mono text-sm text-text-lo">
-          linkflow.to/
+          linkflows.xyz/
         </span>
         <input
           id="cp-handle"

@@ -12,7 +12,7 @@ const FREE = [
   "1 profile, unlimited links",
   "6 themes + a living gradient backdrop",
   "7-day analytics",
-  "linkflow.app/@handle",
+  "linkflows.xyz/@handle",
 ];
 
 const PRO = [

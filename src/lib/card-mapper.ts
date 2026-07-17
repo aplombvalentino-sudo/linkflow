@@ -19,8 +19,13 @@ export function initialsFrom(displayName: string, handle: string): string {
 }
 
 /** A friendly host label for a URL, used as a link's fallback subtitle when the
- *  user didn't set a custom note. "https://twitch.tv/nova" -> "twitch.tv". */
+ *  user didn't set a custom note. "https://twitch.tv/nova" -> "twitch.tv".
+ *  mailto: links have no hostname component (new URL().hostname is empty for
+ *  them), so they're special-cased to show the address itself instead. */
 export function hostFromUrl(url: string): string {
+  if (url.toLowerCase().startsWith("mailto:")) {
+    return url.slice("mailto:".length).split("?")[0];
+  }
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {

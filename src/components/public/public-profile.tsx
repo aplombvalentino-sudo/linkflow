@@ -2,7 +2,7 @@
 // Server Component — plain <a> navigations only, no hooks. Every link points at
 // /r/[linkId] so the click is counted before the visitor is redirected out.
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Mail } from "lucide-react";
 import { THEME_ACCENT } from "@/lib/demo-data";
 import { initialsFrom } from "@/lib/card-mapper";
 import type { ProfileDoc, LinkDoc } from "@/lib/firebase/data";
@@ -63,34 +63,38 @@ export function PublicProfile({ profile, links }: PublicProfileProps) {
         {/* Link stack — each tile is a real navigation through the click tracker */}
         {links.length > 0 && (
           <nav className="mt-9 flex flex-col gap-3">
-            {links.map((link) => (
-              <a
-                key={link.id}
-                href={`/r/${link.id}`}
-                rel="noopener noreferrer nofollow ugc"
-                className="group flex items-center gap-3 rounded-2xl glass px-4 py-4 transition-[transform,border-color] duration-150 hover:-translate-y-0.5 hover:border-volt/40"
-              >
-                <span
-                  aria-hidden
-                  className="h-2 w-2 shrink-0 rounded-full"
-                  style={{ background: accent }}
-                />
-                <span className="min-w-0 flex-1 text-left">
-                  <span className="block truncate font-medium text-text-hi">
-                    {link.title}
-                  </span>
-                  {link.meta && (
-                    <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-text-lo">
-                      {link.meta}
+            {links.map((link) => {
+              const isEmail = link.url.toLowerCase().startsWith("mailto:");
+              const Icon = isEmail ? Mail : ArrowUpRight;
+              return (
+                <a
+                  key={link.id}
+                  href={`/r/${link.id}`}
+                  rel="noopener noreferrer nofollow ugc"
+                  className="group flex items-center gap-3 rounded-2xl glass px-4 py-4 transition-[transform,border-color] duration-150 hover:-translate-y-0.5 hover:border-volt/40"
+                >
+                  <span
+                    aria-hidden
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: accent }}
+                  />
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block truncate font-medium text-text-hi">
+                      {link.title}
                     </span>
-                  )}
-                </span>
-                <ArrowUpRight
-                  aria-hidden
-                  className="h-5 w-5 shrink-0 text-text-lo transition-colors duration-150 group-hover:text-text-hi"
-                />
-              </a>
-            ))}
+                    {link.meta && (
+                      <span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-wider text-text-lo">
+                        {link.meta}
+                      </span>
+                    )}
+                  </span>
+                  <Icon
+                    aria-hidden
+                    className="h-5 w-5 shrink-0 text-text-lo transition-colors duration-150 group-hover:text-text-hi"
+                  />
+                </a>
+              );
+            })}
           </nav>
         )}
 

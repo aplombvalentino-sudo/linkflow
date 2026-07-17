@@ -1,7 +1,10 @@
 // GET /r/[linkId] — the click tracker + outbound redirect. Records the click
 // (best-effort, via resolveAndRecordClick) and 302s to the link's destination.
-// Only http(s) destinations are honored — anything else (javascript:, data:,
-// missing/inactive link) is a 404, so this route can't become an open vector.
+// Only http(s) and mailto: destinations are honored — anything else
+// (javascript:, data:, missing/inactive link) is a 404, so this route can't
+// become an open vector. mailto: is allowed alongside http(s): it can't XSS,
+// open-redirect, or smuggle another protocol, it just launches the visitor's
+// mail client (see assertUrl in validation.ts for the write-side rationale).
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -33,10 +36,14 @@ export async function GET(_req: Request, { params }: RouteContext) {
     notFound();
   }
 
-  // Defense in depth: never redirect to a non-web scheme even if one somehow
-  // got persisted. Only http(s) is allowed to leave through this door.
+  // Defense in depth: never redirect to an unexpected scheme even if one
+  // somehow got persisted. Only http(s) and mailto: are allowed out this door.
   const lower = url.toLowerCase();
-  if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
+  if (
+    !lower.startsWith("http://") &&
+    !lower.startsWith("https://") &&
+    !lower.startsWith("mailto:")
+  ) {
     return new NextResponse(null, { status: 404 });
   }
 

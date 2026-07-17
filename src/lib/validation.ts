@@ -176,9 +176,20 @@ export function handleValidationError(raw: string): string | null {
 
 // ---- link + profile-media validators (product build) ----
 
+/** Pragmatic (not full RFC 5322) email shape check — same bar as the rest of
+ *  this file's validators (e.g. HANDLE_RE). Shared by assertUrl's mailto:
+ *  detection and the client-safe emailAddressError below, so client and
+ *  server can never disagree on what counts as a valid address. */
+const EMAIL_ADDRESS_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /** Validate + normalize a link URL. Accepts a bare host ("maera.fit") by
- *  defaulting to https://. Only http(s) is allowed — javascript:/data:/file:
- *  etc. are rejected to prevent open-redirect + XSS through the /r/ redirect. */
+ *  defaulting to https://, or a bare/mailto:-prefixed email address by
+ *  turning it into a mailto: link. Otherwise only http(s) is allowed —
+ *  javascript:/data:/file: etc. are rejected to prevent open-redirect + XSS
+ *  through the /r/ redirect. mailto: is the one exception: it can't XSS,
+ *  open-redirect, or smuggle another protocol — worst case it opens the
+ *  visitor's own mail client, no riskier than the address appearing in bio
+ *  text. */
 export function assertUrl(value: unknown): string {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new ValidationError("A link URL is required");
@@ -187,6 +198,20 @@ export function assertUrl(value: unknown): string {
   if (raw.length > MAX_URL_LEN) {
     throw new ValidationError(`URL must be at most ${MAX_URL_LEN} characters`);
   }
+
+  const isExplicitMailto = raw.toLowerCase().startsWith("mailto:");
+  const isBareEmail = !isExplicitMailto && !raw.includes("://") && raw.includes("@");
+  if (isExplicitMailto || isBareEmail) {
+    const body = isExplicitMailto ? raw.slice("mailto:".length) : raw;
+    const [addressPart, ...queryParts] = body.split("?");
+    const address = addressPart.trim();
+    if (!EMAIL_ADDRESS_RE.test(address)) {
+      throw new ValidationError("That doesn't look like a valid email address");
+    }
+    const query = queryParts.length > 0 ? `?${queryParts.join("?")}` : "";
+    return `mailto:${address}${query}`;
+  }
+
   // add a scheme if the user typed a bare domain
   if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) {
     raw = `https://${raw}`;
@@ -204,6 +229,17 @@ export function assertUrl(value: unknown): string {
     throw new ValidationError("That doesn't look like a valid URL");
   }
   return parsed.toString();
+}
+
+/** Client-safe (and server-safe) email check for the "Add email" quick-add
+ *  flow — reuses assertUrl's exact rule (EMAIL_ADDRESS_RE) so the two can't
+ *  drift, same pattern as handleValidationError for handles. Returns null
+ *  when valid or empty, a user-facing message otherwise. */
+export function emailAddressError(raw: string): string | null {
+  if (raw.trim().length === 0) return null; // don't nag on an untouched field
+  return EMAIL_ADDRESS_RE.test(raw.trim())
+    ? null
+    : "That doesn't look like a valid email address";
 }
 
 /** Validate a link title (required, trimmed, length-capped, control-stripped). */

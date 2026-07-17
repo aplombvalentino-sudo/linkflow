@@ -33,13 +33,22 @@
 - [x] `/dashboard/*` redirects unauthenticated users — verified: raw 307 to
       `/login?redirectedFrom=%2Fdashboard` (middleware gate confirmed live,
       demo mode confirmed OFF)
+- [x] `/api/auth/session` reaches real logic — verified: `POST {}` returns
+      `400 {"error":"missing-token"}` (was 500, see B-005 below)
+- [x] `/api/stripe/checkout` reaches real logic — verified: unauthenticated
+      `POST` returns `401 {"error":"unauthorized"}` (was 500)
+- [x] `/api/stripe/webhook` signature verification genuinely executes —
+      verified: a request with a deliberately-bad `stripe-signature` header
+      returns `400 {"error":"invalid-signature"}`, proving
+      `stripe.webhooks.constructEvent` actually runs against the real
+      `STRIPE_WEBHOOK_SECRET` (was 500)
 - [ ] `/legal/*` reachable (terms/privacy/cookies/RGPD) — **KNOWN GAP: not built yet**
-- [ ] Auth flow works against production Firebase — **NOT VERIFIED**: this
-      sandbox's clock skew blocks live Firebase Admin SDK calls (see
-      `.claude/memory/blockers.md` B-004), so signup/login could not be
-      exercised end-to-end from here. Code path is unit-tested; needs a real
-      human click-through.
-- [ ] Stripe checkout works (not enabled in v1)
+- [ ] Full signup→checkout→webhook→plan-upgrade happy path with a real
+      browser — **NOT VERIFIED**: this sandbox's clock skew blocks live
+      Firebase Admin SDK calls from *this* environment (see
+      `.claude/memory/blockers.md` B-004), so the flow could only be verified
+      up to "the server logic genuinely executes" via curl, not a full
+      authenticated click-through. Needs a human test.
 
 ## Notes
 
@@ -58,3 +67,22 @@
   signup/login will fail client-side even though the backend is wired
   correctly. Not verified from this sandbox (same clock-skew limitation).
 - The Vercel CLI auto-added `.vercel` and `.env*` to `.gitignore` on `vercel link`.
+- **B-005 (major, resolved) — every route touching firebase-admin/auth
+  returned a generic 500 in production, before any route code ran.**
+  Root cause (found via Vercel dashboard Runtime Logs, which is the only place
+  this surfaced — build logs, `vercel logs` CLI, and the REST events API all
+  came up empty): `firebase-admin@14.1.0` → `jwks-rsa@4.1.0` does a plain
+  `require('jose')`, but `jose` v5+ dropped its CommonJS build entirely
+  (ESM-only). `require()` of a pure-ESM package throws `ERR_REQUIRE_ESM` on
+  Vercel's Node runtime — but did NOT reproduce in local `next dev` or a local
+  `next build && next start` with the identical `node_modules`, which is what
+  made this so hard to pin down (see the long dead-end chase in commit
+  `32ba543`: serverExternalPackages, cache-busting, Turbopack→webpack, none of
+  it touched the real cause). Fixed by pinning `jose` to `4.15.9` — the last
+  major version with a real CJS build — via npm `overrides` in `package.json`;
+  `jwks-rsa` only calls `importJWK`/`exportSPKI`, both stable since jose v4.
+  Verified live: all three previously-500ing routes now return their correct
+  designed status codes, including a webhook signature-verification rejection
+  (proves the fix reaches real Stripe/Firebase logic, not just "no crash").
+  Remove the override once `jwks-rsa` ships a fix upstream (still declares
+  `jose: "^6.1.3"` as of this writing).

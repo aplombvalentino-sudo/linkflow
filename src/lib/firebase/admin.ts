@@ -9,6 +9,17 @@
 //  - Initialization is LAZY: the key is touched only when a server call actually
 //    needs Admin, never at module import — so importing this file (e.g. during a
 //    credential-less CI build) can't crash or read the key.
+//
+// jose override (package.json "overrides"): firebase-admin -> jwks-rsa@4.1.0
+// does a plain `require('jose')`, but jose v5+ dropped its CommonJS build
+// entirely (ESM-only). That plain require() crashes with ERR_REQUIRE_ESM on
+// Vercel's Node runtime specifically — reproduces 100% on every deploy, but
+// NOT in local `next dev` or `next build && next start` (same Node modules,
+// different require/interop behavior). Pinned jose to 4.15.9, the last major
+// version with a real CJS build (`exports.require` -> dist/node/cjs) and the
+// same importJWK/exportSPKI API jwks-rsa actually calls — remove this
+// override once jwks-rsa ships a fix upstream (tracked: it currently still
+// requires jose ^6.1.3 in its own package.json, i.e. not yet fixed).
 import "server-only";
 import {
   initializeApp,

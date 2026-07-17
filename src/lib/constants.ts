@@ -97,6 +97,10 @@ export const PRO_PRODUCT_NAME = "LinkFlow Pro";
 export const CHECKOUT_LIMIT = 5;
 export const CHECKOUT_WINDOW_MS = 60 * 1000;
 
+// ---- Cloudflare Turnstile (bot protection on login/signup) ----
+export const TURNSTILE_VERIFY_URL =
+  "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
 // ---- rate limiting ----
 export const RESERVE_HANDLE_LIMIT = 10;
 export const RESERVE_HANDLE_WINDOW_MS = 10 * 60 * 1000;

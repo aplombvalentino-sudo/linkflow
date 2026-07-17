@@ -10,6 +10,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { submitAuth } from "@/lib/firebase/auth-client";
 import { handleValidationError } from "@/lib/validation";
+import { TurnstileWidget } from "./turnstile-widget";
+import { TURNSTILE_SITE_KEY, hasTurnstileSiteKey } from "@/lib/turnstile-config";
 
 type Status = "idle" | "loading" | "demo" | "error";
 
@@ -30,6 +32,12 @@ export function AuthCard({
   // for obviously-invalid handles; the server (assertHandle) stays authoritative.
   // vibeguard-treated(tests): Lack of Client-Side Input Validation for Handle Length/Format
   const [handleError, setHandleError] = useState<string | null>(null);
+  // Bot check: null until the widget reports a solve. A changing `resetKey`
+  // forces TurnstileWidget to remount (fresh challenge, fresh token) after a
+  // failed submit — Turnstile tokens are single-use and the stale one from a
+  // rejected attempt can't be reused for a retry.
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -52,6 +60,7 @@ export function AuthCard({
       email: String(form.get("email") ?? ""),
       password: String(form.get("password") ?? ""),
       handle: mode === "signup" ? handle : undefined,
+      turnstileToken: turnstileToken ?? undefined,
     });
 
     if (result.ok) {
@@ -66,6 +75,10 @@ export function AuthCard({
     }
     setStatus("error");
     setErrorMessage(result.message ?? "Something went wrong. Try again.");
+    // The token that was just sent is consumed (or rejected) either way —
+    // clear it and force a fresh challenge before the next submit attempt.
+    setTurnstileToken(null);
+    setTurnstileResetKey((k) => k + 1);
   }
 
   return (
@@ -147,9 +160,18 @@ export function AuthCard({
               className="w-full rounded-xl border border-white/15 bg-ink-800 px-4 py-3 text-sm outline-none focus:border-volt"
             />
           </div>
+          {hasTurnstileSiteKey && TURNSTILE_SITE_KEY && (
+            <div className="flex justify-center">
+              <TurnstileWidget
+                key={turnstileResetKey}
+                siteKey={TURNSTILE_SITE_KEY}
+                onToken={setTurnstileToken}
+              />
+            </div>
+          )}
           <button
             type="submit"
-            disabled={status === "loading"}
+            disabled={status === "loading" || (hasTurnstileSiteKey && !turnstileToken)}
             className="mt-2 h-12 cursor-pointer rounded-full bg-volt font-heading font-semibold text-ink-950 transition-[filter] duration-150 hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
           >
             {status === "loading"

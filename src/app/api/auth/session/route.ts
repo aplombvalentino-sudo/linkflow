@@ -18,6 +18,7 @@ import {
 import { AppError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { isFirebaseConfigured } from "@/lib/firebase/config";
+import { isTurnstileEnabled, verifyTurnstileToken } from "@/lib/turnstile-server";
 import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS } from "@/lib/constants";
 
 export const runtime = "nodejs";
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
     bio?: unknown;
     theme?: unknown;
     isPublished?: unknown;
+    turnstileToken?: unknown;
   };
   try {
     body = await req.json();
@@ -44,6 +46,23 @@ export async function POST(req: NextRequest) {
   const idToken = body.idToken;
   if (typeof idToken !== "string" || idToken.length === 0) {
     return NextResponse.json({ error: "missing-token" }, { status: 400 });
+  }
+
+  // Bot check (login + signup): verified BEFORE touching the Admin SDK so bot
+  // traffic fails cheaply. Enforced only when a secret key is configured — a
+  // dev environment without Turnstile keys skips this entirely, matching the
+  // isFirebaseConfigured graceful-degrade pattern.
+  if (isTurnstileEnabled) {
+    const turnstileToken = body.turnstileToken;
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const ip = forwardedFor ? forwardedFor.split(",")[0].trim() : undefined;
+    const passed =
+      typeof turnstileToken === "string" &&
+      turnstileToken.length > 0 &&
+      (await verifyTurnstileToken(turnstileToken, ip));
+    if (!passed) {
+      return NextResponse.json({ error: "bot-check-failed" }, { status: 403 });
+    }
   }
 
   try {

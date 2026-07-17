@@ -17,6 +17,7 @@ export interface SubmitInput {
   email: string;
   password: string;
   handle?: string;
+  turnstileToken?: string;
 }
 
 export interface SubmitResult {
@@ -36,6 +37,7 @@ const MESSAGES: Record<string, string> = {
   "auth/too-many-requests": "Too many attempts. Try again in a bit.",
   "handle-taken": "That handle's taken — pick another.",
   "invalid-input": "Check your details and try again.",
+  "bot-check-failed": "Verification failed — refresh and try again.",
 };
 
 function messageFor(code: string): string {
@@ -61,6 +63,7 @@ export async function submitAuth(input: SubmitInput): Promise<SubmitResult> {
       body: JSON.stringify({
         idToken,
         handle: input.mode === "signup" ? input.handle : undefined,
+        turnstileToken: input.turnstileToken,
       }),
     });
 

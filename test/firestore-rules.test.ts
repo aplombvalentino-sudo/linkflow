@@ -52,7 +52,7 @@ describe("profiles update rule is field-validated (risk #1)", () => {
   it("restricts updatable fields via affectedKeys().hasOnly", () => {
     expect(rules).toContain("request.resource.data.diff(resource.data).affectedKeys()");
     expect(rules).toContain(
-      ".hasOnly(['displayName', 'bio', 'theme', 'isPublished', 'avatarUrl', 'backgroundStyle', 'backgroundImageUrl', 'backgroundColor', 'updatedAt'])",
+      ".hasOnly(['displayName', 'bio', 'theme', 'isPublished', 'avatarUrl', 'backgroundStyle', 'backgroundImageUrl', 'backgroundColor', 'backgroundSplineUrl', 'updatedAt'])",
     );
   });
   it("pins immutable identity fields, including handleLower", () => {
@@ -70,7 +70,9 @@ describe("profiles update rule is field-validated (risk #1)", () => {
     expect(rules).toContain("request.resource.data.displayName is string");
     expect(rules).toContain("request.resource.data.displayName.size() <= 80");
     expect(rules).toContain("request.resource.data.bio.size() <= 300");
-    expect(rules).toContain("request.resource.data.theme in ['volt', 'violet-hour', 'ember']");
+    expect(rules).toContain(
+      "request.resource.data.theme in ['volt', 'violet-hour', 'ember', 'rose', 'reef', 'cobalt']",
+    );
     expect(rules).toContain("request.resource.data.isPublished is bool");
   });
 });

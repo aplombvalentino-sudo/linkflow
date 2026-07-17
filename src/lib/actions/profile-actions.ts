@@ -16,6 +16,7 @@ import {
   assertBackgroundStyle,
   assertColor,
   assertImageUrl,
+  assertSplineUrl,
 } from "@/lib/validation";
 import { getUserPlan, getProfilesForUser } from "@/lib/firebase/data";
 import { PlanLimitError } from "@/lib/errors";
@@ -64,6 +65,7 @@ export async function createProfile(input: {
       backgroundStyle: DEFAULT_BACKGROUND_STYLE,
       backgroundImageUrl: null,
       backgroundColor: null,
+      backgroundSplineUrl: null,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -82,6 +84,7 @@ export interface ProfilePatch {
   backgroundStyle?: string;
   backgroundImageUrl?: string | null;
   backgroundColor?: string | null;
+  backgroundSplineUrl?: string | null;
 }
 
 /** Update the editable fields of a profile. Identity fields (handle/userId) are
@@ -111,6 +114,22 @@ export async function updateProfile(
     }
     if (patch.backgroundColor !== undefined) {
       update.backgroundColor = assertColor(patch.backgroundColor);
+    }
+    if (patch.backgroundSplineUrl !== undefined) {
+      update.backgroundSplineUrl = assertSplineUrl(patch.backgroundSplineUrl);
+    }
+
+    // Custom Spline scenes are a Pro feature. Gate on the RESULTING style —
+    // either what this patch sets it to, or (if untouched) whatever's already
+    // persisted — so editing just the URL on an already-"spline" profile is
+    // gated too, not only the initial style switch. Checked at write time only
+    // (same pattern as FREE_MAX_PROFILES): a downgrade doesn't retroactively
+    // revert an existing profile's background until it's next edited.
+    const resultingStyle = update.backgroundStyle ?? data.backgroundStyle ?? DEFAULT_BACKGROUND_STYLE;
+    if (resultingStyle === "spline" && (await getUserPlan(uid)) !== "pro") {
+      throw new PlanLimitError(
+        "Custom Spline backgrounds are a Pro feature. Upgrade to use your own animated scene.",
+      );
     }
 
     await ref.update(update);

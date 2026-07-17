@@ -89,6 +89,7 @@ export async function POST(req: NextRequest) {
         backgroundStyle: "animated",
         backgroundImageUrl: null,
         backgroundColor: null,
+        backgroundSplineUrl: null,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });

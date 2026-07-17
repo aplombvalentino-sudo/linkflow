@@ -10,14 +10,14 @@ const easeOut: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 const FREE = [
   "1 profile, unlimited links",
-  "All core animations",
+  "6 themes + a living gradient backdrop",
   "7-day analytics",
   "linkflow.app/@handle",
 ];
 
 const PRO = [
   "10 profiles under one account",
-  "All three cinematic themes",
+  "Your own Spline background",
   "Full analytics history",
   "No LinkFlow badge",
 ];

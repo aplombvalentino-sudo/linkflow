@@ -24,10 +24,12 @@ export function ProfileEditor({
   profile,
   initialLinks,
   publicUrl,
+  plan,
 }: {
   profile: ProfileDoc;
   initialLinks: LinkDoc[];
   publicUrl: string;
+  plan: "free" | "pro";
 }) {
   const router = useRouter();
 
@@ -42,6 +44,9 @@ export function ProfileEditor({
   );
   const [backgroundColor, setBackgroundColor] = useState<string | null>(
     profile.backgroundColor,
+  );
+  const [backgroundSplineUrl, setBackgroundSplineUrl] = useState<string | null>(
+    profile.backgroundSplineUrl,
   );
   const [links, setLinks] = useState<LinkDoc[]>(initialLinks);
 
@@ -62,6 +67,7 @@ export function ProfileEditor({
     backgroundStyle: profile.backgroundStyle as string,
     backgroundImageUrl: profile.backgroundImageUrl,
     backgroundColor: profile.backgroundColor,
+    backgroundSplineUrl: profile.backgroundSplineUrl,
   });
 
   const current = {
@@ -73,6 +79,7 @@ export function ProfileEditor({
     backgroundStyle,
     backgroundImageUrl,
     backgroundColor,
+    backgroundSplineUrl,
   };
   const dirty = (Object.keys(current) as (keyof typeof current)[]).some(
     (k) => current[k] !== saved[k],
@@ -102,6 +109,7 @@ export function ProfileEditor({
       backgroundStyle,
       backgroundImageUrl,
       backgroundColor,
+      backgroundSplineUrl,
     });
     if (!res.ok) {
       setErrorMsg(res.message);
@@ -216,10 +224,13 @@ export function ProfileEditor({
               style={backgroundStyle}
               imageUrl={backgroundImageUrl}
               color={backgroundColor}
+              splineUrl={backgroundSplineUrl}
+              isPro={plan === "pro"}
               onChange={(patch) => {
                 if (patch.backgroundStyle !== undefined) setBackgroundStyle(patch.backgroundStyle);
                 if (patch.backgroundImageUrl !== undefined) setBackgroundImageUrl(patch.backgroundImageUrl);
                 if (patch.backgroundColor !== undefined) setBackgroundColor(patch.backgroundColor);
+                if (patch.backgroundSplineUrl !== undefined) setBackgroundSplineUrl(patch.backgroundSplineUrl);
               }}
             />
           </div>

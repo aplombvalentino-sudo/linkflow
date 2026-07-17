@@ -60,12 +60,12 @@ service cloud.firestore {
                     && !request.resource.data.diff(resource.data).affectedKeys()
                          .hasAny(['handleLower', 'handle', 'userId', 'createdAt'])
                     && request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['displayName', 'bio', 'theme', 'isPublished', 'avatarUrl', 'backgroundStyle', 'backgroundImageUrl', 'backgroundColor', 'updatedAt'])
+                         .hasOnly(['displayName', 'bio', 'theme', 'isPublished', 'avatarUrl', 'backgroundStyle', 'backgroundImageUrl', 'backgroundColor', 'backgroundSplineUrl', 'updatedAt'])
                     && request.resource.data.displayName is string
                     && request.resource.data.displayName.size() <= 80
                     && request.resource.data.bio is string
                     && request.resource.data.bio.size() <= 300
-                    && request.resource.data.theme in ['volt', 'violet-hour', 'ember']
+                    && request.resource.data.theme in ['volt', 'violet-hour', 'ember', 'rose', 'reef', 'cobalt']
                     && request.resource.data.isPublished is bool;
       allow delete: if isOwner(resource.data.userId);
     }

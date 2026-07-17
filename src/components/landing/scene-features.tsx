@@ -163,7 +163,7 @@ function AnalyticsVisual() {
 }
 
 /* Beat 3 — theme cycler */
-const THEMES: DemoTheme[] = ["volt", "violet-hour", "ember"];
+const THEMES: DemoTheme[] = ["volt", "violet-hour", "ember", "rose", "reef", "cobalt"];
 
 function ThemeVisual() {
   const [idx, setIdx] = useState(0);
@@ -195,7 +195,11 @@ function ThemeVisual() {
           </AnimatePresence>
         </div>
       </div>
-      <div className="flex gap-3" role="tablist" aria-label="Theme preview">
+      <div
+        className="flex max-w-[240px] flex-wrap justify-center gap-3"
+        role="tablist"
+        aria-label="Theme preview"
+      >
         {THEMES.map((t, i) => (
           <button
             key={t}
@@ -299,7 +303,7 @@ export function SceneFeatures() {
       <Beat
         chip="03 / 05 — themes"
         title="Motion is your brand color."
-        body="Three cinematic themes tuned for 60fps. Pick one; stay recognizable everywhere."
+        body="Six cinematic themes tuned for 60fps. Pick one; stay recognizable everywhere."
         visual={<ThemeVisual />}
       />
       <Beat

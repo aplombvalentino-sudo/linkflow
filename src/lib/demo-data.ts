@@ -2,7 +2,13 @@
 // Clearly presented as demos — no fabricated testimonials (honesty rule,
 // specs/landing-wireframe.md §04).
 
-export type DemoTheme = "volt" | "violet-hour" | "ember";
+export type DemoTheme =
+  | "volt"
+  | "violet-hour"
+  | "ember"
+  | "rose"
+  | "reef"
+  | "cobalt";
 
 export interface DemoLink {
   title: string;
@@ -24,6 +30,9 @@ export const THEME_ACCENT: Record<DemoTheme, string> = {
   volt: "#d4ff3f",
   "violet-hour": "#7c6cff",
   ember: "#ff8a3d",
+  rose: "#ff4d8d",
+  reef: "#2fe6d1",
+  cobalt: "#4f8bff",
 };
 
 export const DEMO_PROFILES: DemoProfile[] = [

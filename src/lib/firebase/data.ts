@@ -24,6 +24,9 @@ export interface ProfileDoc {
   backgroundStyle: BackgroundStyle;
   backgroundImageUrl: string | null;
   backgroundColor: string | null;
+  /** Pro-only: the profile owner's own Spline (spline.design) scene URL, used
+   *  as the public page's backdrop when backgroundStyle === "spline". */
+  backgroundSplineUrl: string | null;
 }
 
 export interface LinkDoc {
@@ -53,6 +56,7 @@ function toProfile(id: string, d: DocumentData): ProfileDoc {
     backgroundStyle: (d.backgroundStyle as BackgroundStyle) ?? DEFAULT_BACKGROUND_STYLE,
     backgroundImageUrl: d.backgroundImageUrl ?? null,
     backgroundColor: d.backgroundColor ?? null,
+    backgroundSplineUrl: d.backgroundSplineUrl ?? null,
   };
 }
 

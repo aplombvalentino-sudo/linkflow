@@ -1,55 +1,31 @@
-// The full-page backdrop behind a public profile. Three treatments — a slow
-// animated theme glow (default), a user cover image, or a flat solid color —
-// plus a fixed legibility overlay so foreground text stays readable over any
-// of them. Server Component: no hooks, just markup + an injected <style>.
+// The full-page backdrop behind a public profile. Four treatments — a
+// mouse-reactive theme glow (default, free), a user cover image, a flat solid
+// color, or a Pro user's own Spline scene — plus a fixed legibility overlay so
+// foreground text stays readable over any of them. Server Component: the
+// Spline iframe and static layers are plain markup; the animated treatment
+// delegates to a small client island for its pointer interactivity.
 import { THEME_ACCENT } from "@/lib/demo-data";
 import type { ProfileDoc } from "@/lib/firebase/data";
+import { AnimatedGradientBackground } from "./animated-gradient-background";
 
 interface ProfileBackgroundProps {
   style: ProfileDoc["backgroundStyle"];
   theme: ProfileDoc["theme"];
   imageUrl: string | null;
   color: string | null;
+  /** Pro-only Spline (spline.design) scene URL. Already host-validated at
+   *  write time (assertSplineUrl) — trusted here without re-checking plan. */
+  splineUrl: string | null;
 }
 
 const INK_950 = "#07070b";
-
-/** Animated treatment: two slow radial blobs built from the theme accent,
- *  drifting over the ink base. Reduced-motion visitors get the same gradient,
- *  frozen. Keyframes are name-scoped (lf-bg-*) so nothing else collides. */
-function AnimatedLayer({ accent }: { accent: string }) {
-  const css =
-    "@keyframes lf-bg-drift {" +
-    "0% { transform: translate3d(-4%, -2%, 0) scale(1.05); }" +
-    "50% { transform: translate3d(4%, 3%, 0) scale(1.15); }" +
-    "100% { transform: translate3d(-4%, -2%, 0) scale(1.05); }" +
-    "}" +
-    ".lf-bg-animated {" +
-    "background-color: " + INK_950 + ";" +
-    "background-image:" +
-    " radial-gradient(42rem 42rem at 22% 18%, " + accent + "26, transparent 60%)," +
-    " radial-gradient(38rem 38rem at 82% 88%, " + accent + "1f, transparent 62%);" +
-    "background-repeat: no-repeat;" +
-    "will-change: transform;" +
-    "animation: lf-bg-drift 26s ease-in-out infinite;" +
-    "}" +
-    "@media (prefers-reduced-motion: reduce) {" +
-    ".lf-bg-animated { animation: none; }" +
-    "}";
-
-  return (
-    <>
-      <style>{css}</style>
-      <div aria-hidden className="lf-bg-animated fixed inset-0 -z-10" />
-    </>
-  );
-}
 
 export function ProfileBackground({
   style,
   theme,
   imageUrl,
   color,
+  splineUrl,
 }: ProfileBackgroundProps) {
   const accent = THEME_ACCENT[theme] ?? THEME_ACCENT.volt;
 
@@ -70,9 +46,24 @@ export function ProfileBackground({
         style={{ backgroundColor: color || INK_950 }}
       />
     );
+  } else if (style === "spline" && splineUrl) {
+    base = (
+      <div aria-hidden className="fixed inset-0 -z-10 bg-ink-950">
+        {/* No allow-top-navigation/allow-popups/allow-forms — a background
+            embed must never redirect, pop, or submit on the visitor's behalf.
+            no-referrer keeps the visitor's LinkFlow URL from leaking to Spline. */}
+        <iframe
+          src={splineUrl}
+          title="Background animation"
+          referrerPolicy="no-referrer"
+          sandbox="allow-scripts allow-same-origin"
+          className="h-full w-full border-0"
+        />
+      </div>
+    );
   } else {
-    // "animated", plus the "image"-without-url fallback.
-    base = <AnimatedLayer accent={accent} />;
+    // "animated", plus the "image"- and "spline"-without-url fallbacks.
+    base = <AnimatedGradientBackground accent={accent} />;
   }
 
   return (

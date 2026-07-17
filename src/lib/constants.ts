@@ -21,15 +21,30 @@ export const MAX_BIO_LEN = 300;
 
 // ---- profile theme (risk #2). Keep in sync with the literal list in
 // firestore.rules' `theme in [...]` check — Security Rules can't import JS. ----
-export const THEMES = ["volt", "violet-hour", "ember"] as const;
+export const THEMES = [
+  "volt",
+  "violet-hour",
+  "ember",
+  "rose",
+  "reef",
+  "cobalt",
+] as const;
 
 // ---- profile background ----
 // How a published profile's full-page backdrop is rendered:
-//  - "animated": a moving gradient built from the theme accent (default)
+//  - "animated": a mouse-reactive gradient built from the theme accent (default, free)
 //  - "image":    a user-uploaded cover photo (backgroundImageUrl)
 //  - "solid":    a single flat color (backgroundColor)
-export const BACKGROUND_STYLES = ["animated", "image", "solid"] as const;
+//  - "spline":   a user's own Spline (spline.design) 3D scene, embedded live via
+//                its public URL (backgroundSplineUrl) — Pro only, gated in
+//                updateProfile; see assertSplineUrl for the host allow-list.
+export const BACKGROUND_STYLES = ["animated", "image", "solid", "spline"] as const;
 export const DEFAULT_BACKGROUND_STYLE = "animated";
+
+/** Spline embeds are restricted to this domain (and its subdomains) — a public
+ *  profile page must never render an arbitrary third-party iframe as its full-
+ *  page backdrop (phishing/clickjacking risk). */
+export const SPLINE_HOST_SUFFIX = "spline.design";
 
 // ---- links ----
 export const MAX_LINK_TITLE_LEN = 120;

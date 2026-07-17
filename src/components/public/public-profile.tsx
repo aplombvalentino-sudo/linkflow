@@ -24,6 +24,7 @@ export function PublicProfile({ profile, links }: PublicProfileProps) {
         theme={profile.theme}
         imageUrl={profile.backgroundImageUrl}
         color={profile.backgroundColor}
+        splineUrl={profile.backgroundSplineUrl}
       />
 
       <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-14 pt-16">

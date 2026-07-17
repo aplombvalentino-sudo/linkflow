@@ -1,7 +1,7 @@
 "use client";
 
-// Theme picker: three accent swatches (volt / violet hour / ember). The chosen
-// one gets a volt ring. Pure controlled component — parent owns the value.
+// Theme picker: six accent swatches. The chosen one gets a volt ring. Pure
+// controlled component — parent owns the value.
 import { THEMES } from "@/lib/constants";
 import { THEME_ACCENT, type DemoTheme } from "@/lib/demo-data";
 
@@ -9,6 +9,9 @@ const LABELS: Record<DemoTheme, string> = {
   volt: "volt",
   "violet-hour": "violet hour",
   ember: "ember",
+  rose: "rose",
+  reef: "reef",
+  cobalt: "cobalt",
 };
 
 export function ThemeSelector({

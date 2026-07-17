@@ -5,7 +5,7 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { verifySession } from "@/lib/firebase/auth-server";
-import { getProfileById, getLinksForProfile } from "@/lib/firebase/data";
+import { getProfileById, getLinksForProfile, getUserPlan } from "@/lib/firebase/data";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { ProfileEditor } from "@/components/dashboard/profile-editor";
 
@@ -24,7 +24,10 @@ export default async function ProfileEditorPage({
   const profile = await getProfileById(profileId);
   if (!profile || profile.userId !== uid) notFound();
 
-  const links = await getLinksForProfile(profileId, {});
+  const [links, plan] = await Promise.all([
+    getLinksForProfile(profileId, {}),
+    getUserPlan(uid),
+  ]);
 
   const h = await headers();
   const host = h.get("host");
@@ -39,6 +42,7 @@ export default async function ProfileEditorPage({
           profile={profile}
           initialLinks={links}
           publicUrl={publicUrl}
+          plan={plan}
         />
       </main>
     </>

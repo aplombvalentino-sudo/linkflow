@@ -20,6 +20,7 @@ import {
   MAX_LINK_META_LEN,
   MAX_URL_LEN,
   ALLOWED_URL_PROTOCOLS,
+  SPLINE_HOST_SUFFIX,
 } from "./constants";
 import { ValidationError } from "./errors";
 import { stripControlChars } from "./sanitize";
@@ -261,6 +262,34 @@ export function assertImageUrl(value: unknown): string | null {
   }
   if (!(ALLOWED_URL_PROTOCOLS as readonly string[]).includes(parsed.protocol)) {
     throw new ValidationError("Invalid image URL");
+  }
+  return parsed.toString();
+}
+
+/** Validate a Spline (spline.design) scene URL for use as a public profile's
+ *  full-page background. Returns null to clear the field. Restricted to
+ *  spline.design and its subdomains — a public page must never embed an
+ *  arbitrary third-party iframe as its backdrop (phishing/clickjacking risk),
+ *  so unlike assertImageUrl this is NOT a general-purpose URL validator. */
+export function assertSplineUrl(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") throw new ValidationError("Invalid Spline URL");
+  const clean = stripControlChars(value).trim();
+  if (clean.length > MAX_URL_LEN) throw new ValidationError("Spline URL too long");
+  let raw = clean;
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) raw = `https://${raw}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new ValidationError("That doesn't look like a valid Spline URL");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new ValidationError("Spline URLs must start with https://");
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (host !== SPLINE_HOST_SUFFIX && !host.endsWith(`.${SPLINE_HOST_SUFFIX}`)) {
+    throw new ValidationError(`Only ${SPLINE_HOST_SUFFIX} scene links are supported`);
   }
   return parsed.toString();
 }

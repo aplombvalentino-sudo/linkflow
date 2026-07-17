@@ -30,6 +30,7 @@ import {
 } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { SESSION_COOKIE } from "@/lib/constants";
 import { ServiceUnavailableError } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -71,7 +72,13 @@ function adminApp(): App {
   if (cachedApp) return cachedApp;
   cachedApp = getApps().length
     ? getApp()
-    : initializeApp({ credential: cert(getAdminCredentialConfig()) });
+    : initializeApp({
+        credential: cert(getAdminCredentialConfig()),
+        // Storage bucket for avatar/background uploads. The bucket id is a
+        // public identifier (same value as NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET);
+        // access is governed by the Admin credential + our upload route's auth.
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      });
   return cachedApp;
 }
 
@@ -101,4 +108,11 @@ export function guardAdmin<T>(accessor: () => T, event: string): T {
 /** Firestore accessor with the guard applied (risks #8–#11). */
 export function getAdminDbOrThrow(): Firestore {
   return guardAdmin(getAdminDb, "admin_db_unavailable");
+}
+
+/** Default Storage bucket, guarded like getAdminDbOrThrow. Used by the image
+ *  upload route to store avatars/backgrounds server-side (client never touches
+ *  Storage directly — no Storage rules to get wrong). */
+export function getAdminBucketOrThrow() {
+  return guardAdmin(() => getStorage(adminApp()).bucket(), "admin_storage_unavailable");
 }

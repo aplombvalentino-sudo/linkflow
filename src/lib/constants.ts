@@ -23,6 +23,38 @@ export const MAX_BIO_LEN = 300;
 // firestore.rules' `theme in [...]` check — Security Rules can't import JS. ----
 export const THEMES = ["volt", "violet-hour", "ember"] as const;
 
+// ---- profile background ----
+// How a published profile's full-page backdrop is rendered:
+//  - "animated": a moving gradient built from the theme accent (default)
+//  - "image":    a user-uploaded cover photo (backgroundImageUrl)
+//  - "solid":    a single flat color (backgroundColor)
+export const BACKGROUND_STYLES = ["animated", "image", "solid"] as const;
+export const DEFAULT_BACKGROUND_STYLE = "animated";
+
+// ---- links ----
+export const MAX_LINK_TITLE_LEN = 120;
+export const MAX_LINK_META_LEN = 60;
+export const MAX_URL_LEN = 2048;
+/** URL schemes we allow a link/avatar/background to point at. Blocks
+ *  javascript:, data:, file:, etc. (open-redirect / XSS defense). */
+export const ALLOWED_URL_PROTOCOLS = ["http:", "https:"] as const;
+
+// ---- plan limits ----
+export const FREE_MAX_PROFILES = 1;
+export const PRO_MAX_PROFILES = 10;
+export const MAX_LINKS_PER_PROFILE = 100;
+
+// ---- image uploads (avatar + background) ----
+export const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2 MB
+export const MAX_BACKGROUND_BYTES = 5 * 1024 * 1024; // 5 MB
+export const ALLOWED_IMAGE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+] as const;
+export const UPLOAD_KINDS = ["avatar", "background"] as const;
+
 // ---- logging (risk #4) ----
 export const MAX_LOG_STRING_LEN = 2000;
 

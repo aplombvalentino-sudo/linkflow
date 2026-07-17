@@ -52,7 +52,7 @@ describe("profiles update rule is field-validated (risk #1)", () => {
   it("restricts updatable fields via affectedKeys().hasOnly", () => {
     expect(rules).toContain("request.resource.data.diff(resource.data).affectedKeys()");
     expect(rules).toContain(
-      ".hasOnly(['displayName', 'bio', 'theme', 'isPublished', 'updatedAt'])",
+      ".hasOnly(['displayName', 'bio', 'theme', 'isPublished', 'avatarUrl', 'backgroundStyle', 'backgroundImageUrl', 'backgroundColor', 'updatedAt'])",
     );
   });
   it("pins immutable identity fields, including handleLower", () => {
@@ -78,10 +78,10 @@ describe("profiles update rule is field-validated (risk #1)", () => {
 describe("links update rule is field-validated (risk #2)", () => {
   it("restricts updatable fields and excludes clickCount (server-only)", () => {
     expect(rules).toContain(
-      ".hasOnly(['title', 'url', 'thumbnailUrl', 'position', 'isActive', 'updatedAt'])",
+      ".hasOnly(['title', 'url', 'thumbnailUrl', 'meta', 'position', 'isActive', 'updatedAt'])",
     );
     // clickCount must NOT be client-editable
-    expect(rules).not.toContain("'clickCount', 'updatedAt'])");
+    expect(rules).not.toContain("clickCount'");
   });
   it("type/size checks the content fields", () => {
     expect(rules).toContain("request.resource.data.title is string");

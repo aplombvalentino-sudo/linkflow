@@ -85,6 +85,10 @@ export async function POST(req: NextRequest) {
         bio,
         theme,
         isPublished,
+        avatarUrl: null,
+        backgroundStyle: "animated",
+        backgroundImageUrl: null,
+        backgroundColor: null,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });

@@ -15,6 +15,11 @@ import {
   MAX_DISPLAY_NAME_LEN,
   MAX_BIO_LEN,
   THEMES,
+  BACKGROUND_STYLES,
+  MAX_LINK_TITLE_LEN,
+  MAX_LINK_META_LEN,
+  MAX_URL_LEN,
+  ALLOWED_URL_PROTOCOLS,
 } from "./constants";
 import { ValidationError } from "./errors";
 import { stripControlChars } from "./sanitize";
@@ -166,4 +171,96 @@ export function handleValidationError(raw: string): string | null {
   } catch (err) {
     return err instanceof ValidationError ? err.message : "Invalid handle";
   }
+}
+
+// ---- link + profile-media validators (product build) ----
+
+/** Validate + normalize a link URL. Accepts a bare host ("maera.fit") by
+ *  defaulting to https://. Only http(s) is allowed — javascript:/data:/file:
+ *  etc. are rejected to prevent open-redirect + XSS through the /r/ redirect. */
+export function assertUrl(value: unknown): string {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new ValidationError("A link URL is required");
+  }
+  let raw = stripControlChars(value).trim();
+  if (raw.length > MAX_URL_LEN) {
+    throw new ValidationError(`URL must be at most ${MAX_URL_LEN} characters`);
+  }
+  // add a scheme if the user typed a bare domain
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw)) {
+    raw = `https://${raw}`;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new ValidationError("That doesn't look like a valid URL");
+  }
+  if (!(ALLOWED_URL_PROTOCOLS as readonly string[]).includes(parsed.protocol)) {
+    throw new ValidationError("Links must start with http:// or https://");
+  }
+  if (!parsed.hostname || !parsed.hostname.includes(".")) {
+    throw new ValidationError("That doesn't look like a valid URL");
+  }
+  return parsed.toString();
+}
+
+/** Validate a link title (required, trimmed, length-capped, control-stripped). */
+export function assertLinkTitle(value: unknown): string {
+  if (typeof value !== "string") throw new ValidationError("Invalid title");
+  const clean = stripControlChars(value).trim();
+  if (clean.length === 0) throw new ValidationError("A link title is required");
+  if (clean.length > MAX_LINK_TITLE_LEN) {
+    throw new ValidationError(`Title must be at most ${MAX_LINK_TITLE_LEN} characters`);
+  }
+  return clean;
+}
+
+/** Validate an optional link subtitle ("Most popular", "3 spots left", …). */
+export function assertLinkMeta(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value !== "string") throw new ValidationError("Invalid link note");
+  const clean = stripControlChars(value).trim();
+  if (clean.length > MAX_LINK_META_LEN) {
+    throw new ValidationError(`Note must be at most ${MAX_LINK_META_LEN} characters`);
+  }
+  return clean;
+}
+
+export type BackgroundStyle = (typeof BACKGROUND_STYLES)[number];
+
+export function assertBackgroundStyle(value: unknown, fallback: BackgroundStyle): BackgroundStyle {
+  if (value == null) return fallback;
+  if (typeof value !== "string" || !(BACKGROUND_STYLES as readonly string[]).includes(value)) {
+    throw new ValidationError(`background must be one of: ${BACKGROUND_STYLES.join(", ")}`);
+  }
+  return value as BackgroundStyle;
+}
+
+/** Validate a hex color like #d4ff3f. Returns null for empty/missing. */
+export function assertColor(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string" || !/^#[0-9a-fA-F]{6}$/.test(value.trim())) {
+    throw new ValidationError("Color must be a 6-digit hex like #07070b");
+  }
+  return value.trim().toLowerCase();
+}
+
+/** Validate an image URL that we produced (avatar/background). Returns null to
+ *  clear the field. Only http(s) — same protocol allow-list as links. */
+export function assertImageUrl(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") throw new ValidationError("Invalid image URL");
+  const clean = value.trim();
+  if (clean.length > MAX_URL_LEN) throw new ValidationError("Image URL too long");
+  let parsed: URL;
+  try {
+    parsed = new URL(clean);
+  } catch {
+    throw new ValidationError("Invalid image URL");
+  }
+  if (!(ALLOWED_URL_PROTOCOLS as readonly string[]).includes(parsed.protocol)) {
+    throw new ValidationError("Invalid image URL");
+  }
+  return parsed.toString();
 }

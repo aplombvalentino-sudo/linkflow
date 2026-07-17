@@ -42,3 +42,30 @@ export class ServiceUnavailableError extends AppError {
     super("service-unavailable", message, 503);
   }
 }
+
+/** No valid session — the caller must sign in. */
+export class UnauthorizedError extends AppError {
+  constructor(message = "Please sign in and try again.") {
+    super("unauthorized", message, 401);
+  }
+}
+
+/** Authenticated, but not the owner of the target resource. */
+export class ForbiddenError extends AppError {
+  constructor(message = "You don't have access to that.") {
+    super("forbidden", message, 403);
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(message = "Not found.") {
+    super("not-found", message, 404);
+  }
+}
+
+/** A plan limit was hit (e.g. Free = 1 profile). Nudges toward upgrade. */
+export class PlanLimitError extends AppError {
+  constructor(message: string) {
+    super("plan-limit", message, 403);
+  }
+}

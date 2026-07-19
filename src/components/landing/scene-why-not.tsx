@@ -54,7 +54,9 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-full w-screen max-w-[100vw] shrink-0 snap-center items-center md:w-[calc(100vw)] ">
+    // w-full stacks cleanly on mobile; md:w-screen fills each slot of the
+    // desktop horizontal track. md:h-full lets the track stretch it full-height.
+    <div className="flex w-full max-w-[100vw] shrink-0 snap-center items-center md:h-full md:w-screen">
       <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-10 px-6 md:grid-cols-2">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-lo">{index}</p>
@@ -146,10 +148,10 @@ export function SceneWhyNot() {
           {panels}
         </motion.div>
       </div>
-      {/* mobile: swipe-snap track (MASTER.md §4 mobile rule) */}
-      <div className="flex snap-x snap-mandatory overflow-x-auto py-20 md:hidden [&>div]:py-6">
-        {panels}
-      </div>
+      {/* mobile: a clean vertical stack — a horizontal swipe track inside a
+          vertically-scrolling page fights the user's scroll and exposes a raw
+          scrollbar. Each panel is a full-width block. */}
+      <div className="flex flex-col gap-16 py-16 md:hidden">{panels}</div>
     </section>
   );
 }

@@ -12,12 +12,18 @@ import {
 import { MagneticButton } from "./magnetic-button";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { DEMO_PROFILES } from "@/lib/demo-data";
+import { useIsMobile } from "@/lib/use-is-mobile";
 
 const HEADLINE_WORDS = ["Your", "link", "is", "a", "stage."];
 
 export function SceneHero() {
   const ref = useRef<HTMLElement>(null);
   const reduceMotion = useReducedMotion();
+  const isMobile = useIsMobile();
+  // On phones the pinned, scroll-scrubbed hero reads as broken — clip the tall
+  // headline under the fixed nav and stall for 2.6 screens. Fall back to a
+  // clean static, top-aligned layout there (like reduced-motion).
+  const staticMode = reduceMotion || isMobile;
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start start", "end end"],
@@ -30,17 +36,18 @@ export function SceneHero() {
   const copyY = useTransform(scrollYProgress, [0.7, 0.95], [0, -48]);
 
   return (
-    <section ref={ref} aria-labelledby="hero-title" className="relative h-[260vh]">
-      <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+    <section ref={ref} aria-labelledby="hero-title" className="relative md:h-[260vh]">
+      {/* mobile: natural, top-aligned block below the nav. desktop: pinned + centered. */}
+      <div className="flex min-h-screen items-start overflow-hidden pt-28 md:sticky md:top-0 md:h-screen md:items-center md:pt-0">
         {/* violet radial glow — chapter 01 accent */}
         <motion.div
           aria-hidden
-          style={reduceMotion ? undefined : { scale: glowScale }}
+          style={staticMode ? undefined : { scale: glowScale }}
           className="pointer-events-none absolute left-[60%] top-1/2 h-[42rem] w-[42rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet/20 blur-[120px]"
         />
 
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-12 px-6 pt-24 lg:grid-cols-2 lg:pt-0">
-          <motion.div style={reduceMotion ? undefined : { opacity: copyOpacity, y: copyY }}>
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-12 px-6 pb-16 md:pb-0 lg:grid-cols-2">
+          <motion.div style={staticMode ? undefined : { opacity: copyOpacity, y: copyY }}>
             <p className="font-mono text-xs uppercase tracking-[0.2em] text-text-lo">
               01 / 05 — the stage
             </p>
@@ -98,9 +105,9 @@ export function SceneHero() {
 
           {/* glass phone playing the demo profile */}
           <motion.div
-            style={reduceMotion ? undefined : { y: phoneY, rotate: phoneRotate }}
+            style={staticMode ? undefined : { y: phoneY, rotate: phoneRotate }}
             initial={reduceMotion ? false : { opacity: 0, y: 96 }}
-            animate={{ opacity: 1, y: 56 }}
+            animate={{ opacity: 1, y: staticMode ? 0 : 56 }}
             transition={{ duration: 0.8, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
             className="mx-auto w-full max-w-[340px]"
           >

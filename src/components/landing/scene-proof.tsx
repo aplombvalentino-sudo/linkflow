@@ -12,10 +12,12 @@ import {
 } from "framer-motion";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { DEMO_PROFILES } from "@/lib/demo-data";
+import { useIsMobile } from "@/lib/use-is-mobile";
 
 export function SceneProof() {
   const ref = useRef<HTMLElement>(null);
   const reduceMotion = useReducedMotion();
+  const isMobile = useIsMobile();
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start end", "end start"],
@@ -50,16 +52,19 @@ export function SceneProof() {
         </p>
       </div>
 
+      {/* mobile: a swipeable snap carousel (hidden scrollbar) — the desktop
+          scroll-drift reel just clips the outer cards on a narrow screen.
+          desktop: keep the drift, centered and clipped by the section. */}
       <motion.div
-        style={reduceMotion ? undefined : { x: reelX }}
-        className="mt-14 flex justify-center gap-8 px-6"
+        style={reduceMotion || isMobile ? undefined : { x: reelX }}
+        className="no-scrollbar mt-14 flex snap-x snap-mandatory gap-6 overflow-x-auto px-6 pb-4 md:snap-none md:justify-center md:gap-8 md:overflow-visible md:pb-0"
       >
         {DEMO_PROFILES.map((p, i) => {
-          const rotate = reduceMotion ? 0 : (i - 1) * 4;
+          const rotate = reduceMotion || isMobile ? 0 : (i - 1) * 4;
           return (
             <motion.div
               key={p.handle}
-              className="w-[280px] shrink-0"
+              className="w-[280px] shrink-0 snap-center"
               style={{ rotate }}
               initial={{ opacity: 0, y: 64 }}
               whileInView={{ opacity: 1, y: i === 1 ? -16 : 0 }}

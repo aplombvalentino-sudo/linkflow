@@ -59,6 +59,16 @@ body {
   box-shadow: 0 0 48px var(--volt-dim);
 }
 
+/* Hide the native scrollbar on horizontal swipe carousels (mobile proof reel)
+   while keeping the element scrollable — an exposed scrollbar reads as a bug. */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
 ::selection {
   background: var(--color-volt);
   color: var(--color-ink-950);
